@@ -43,7 +43,7 @@
       "version_requirement": ">= 4.5.1 < 6.0.0"
     },
     {
-      "name": "onyxpoint/gpasswd",
+      "name": "simp/gpasswd",
       "version_requirement": ">= 1.1.2 < 2.0.0"
     },
     {
@@ -231,10 +231,6 @@
       "version_requirement": ">= 0.9.1 < 1.0.0"
     },
     {
-      "name": "simp/ntpd",
-      "version_requirement": ">= 6.7.0 < 7.0.0"
-    },
-    {
       "name": "simp/pam",
       "version_requirement": ">= 6.11.1 < 8.0.0"
     },
@@ -287,7 +283,7 @@
       "version_requirement": ">= 0.6.0 < 2.0.0"
     },
     {
-      "name": "puppet-nsswitch",
+      "name": "trlinkin/nsswitch",
       "version_requirement": ">= 2.3.0 < 4.0.0"
     }
   ],
