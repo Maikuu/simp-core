@@ -86,65 +86,28 @@ the current ISO was produced:
     isoinfo -R -f -i <iso> | grep -E 'isolinux.bin|efiboot.img|BOOTX64.EFI'
     mount -o loop,ro <iso> /mnt && grep '^default' /mnt/isolinux/isolinux.cfg
 
-Current build: 3.0 GB, `default simp`, BaseOS 595 + AppStream 206 RPMs,
-SimpRepos/SIMP 113, SimpRepos/puppet 4.
-
-## Regenerating the keep-list
-
-`9-simp_pkglist.txt` (694 packages) is the dependency closure of
-`@minimal-environment` + `@core` + the kickstart's explicit packages + all SIMP
-packages, resolved against the DVD. Regenerate after changing the component set —
-see `docs/el9-phase4-iso.md` for the exact dnf invocation.
-
-## Rebuilding a single asset RPM
-
-`require_rebuild?` does not notice edited component sources, and the documented
-`SIMP_BUILD_PKG_require_rebuild` override is dead code (`ENV.select` returns a
-Hash, and `Hash =~ Regexp` is always nil). After patching a component you must
-remove its `dist/` or the build will silently reuse the stale RPM:
-
-    rm -rf src/assets/rubygem_simp_cli/dist
-    bundle exec rake pkg:aux
-
-Then confirm the change actually landed in the RPM before building the ISO:
-
-    rpm2cpio src/assets/rubygem_simp_cli/dist/rubygem-simp-cli-*.el9.noarch.rpm \
-      | cpio -i --quiet --to-stdout '*/lib/simp/cli/commands/bootstrap.rb' \
-      | grep -c 'pre-JEP-223'          # expect 1, not 0
-
-## Two more stale-artifact traps
-
-* **The DVD_Overlay tarball.** `build:auto` reuses an existing
-  `DVD_Overlay/SIMP-*.tar.gz` instead of rebuilding it, so a freshly rebuilt RPM
-  will not reach the ISO unless the tarball is removed first:
-
-      rm -rf build/distributions/RedHat/9/x86_64/DVD_Overlay /build/SIMP_ISO_STAGING
-
-* **`SIMP_BUILD_checkout=no` is load-bearing.** Without it `build:auto` runs
-  `deps:checkout`, which wipes `src/assets` and silently discards every patch
-  from `build/el9-patches/simp-cli/`.
-
-## Status
-
-The ISO boots and installs. `simp config` and `simp bootstrap` have both been
-run to completion on EL9 (bootstrap RC=0, puppetserver on 8140, 389-DS up), but
-that was on a host where blockers 1, 1b and 11 had been patched **by hand**.
-
-Current build — the first to carry all four simp-cli fixes in the RPM itself:
+Current build -- carries the four simp-cli fixes, the chkconfig/initscripts
+kickstart fix (blocker 12) and the `$environment` module fix (blocker 13):
 
 | | |
 |---|---|
-| built | 2026-09-06 00:06 |
+| built | 2026-09-06 01:02 |
 | size | 3231877120 bytes |
-| sha256 | `6cb26f9b313368b9aec539e01ff03bd8de2444969b775c9cbc852fe4e7b70caa` |
+| sha256 | `6ba1c3927d6715ce461caaf89518a0f14db81d1b7ba4ae0c43ab55b0a30f45ee` |
 | `checkisomd5` | "It is OK to use this media." |
 | repos | BaseOS 636, AppStream 259, SimpRepos/SIMP 127, SimpRepos/puppet 4 |
 | boot | `default simp` |
 
-Verified by extracting `rubygem-simp-cli-8.0.0-1.el9.noarch.rpm` **from the
-mounted ISO** (not just from `dist/`) and confirming each fix is present and
-each superseded line is gone. Still needs a clean end-to-end install to prove
-`simp config` runs through without the hand-patching.
+Verified by mounting the ISO and checking the shipped artifacts directly (not
+`dist/`): the four simp-cli fixes in `rubygem-simp-cli`, `chkconfig` and
+`initscripts` in the kickstart's `%packages`, and zero remaining
+`$facts['environment']` occurrences across the `clamav`, `dhcp`, `freeradius`
+and `simp_apache` RPMs.
+
+The previous ISO has been installed end to end: `simp config` and
+`simp bootstrap` both completed without hand-patching, which is what surfaced
+blockers 12 and 13. Those two fixes are in this ISO but have only been proven
+by patching the running node, not yet by a fresh install from this media.
 The likeliest next failures are in `auto.cfg`'s `%post`: FIPS enablement (EL9 uses
 `crypto-policies-scripts`/`fips-mode-setup`, and `fipscheck` no longer exists) and
 `simp_filesystem.repo` generation.
