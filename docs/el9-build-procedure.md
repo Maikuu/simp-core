@@ -59,6 +59,11 @@ is the AlmaLinux 9.8 VM at `10.20.31.130` (`/build`, a dedicated 500 GB XFS disk
     bash build/el9-patches/environment-skeleton/apply-el9-hiera.sh
     bash build/el9-patches/rsync-skeleton/apply-el9-rsync.sh
 
+    # REQUIRED when signing with a key other than 'dev': publish the signing
+    # public key into the gpgkeys asset. src/assets is gitignored and wiped by
+    # deps:checkout, so this is re-applied rather than committed.
+    bash build/el9-patches/gpgkeys/apply-el9-gpgkeys.sh prod
+
     bundle exec rake 'pkg:key_prep[dev]'    # dev signing key; expires in 14 days
     bundle exec rake pkg:modules
     bundle exec rake pkg:aux
@@ -158,6 +163,47 @@ Which `dist/` goes with which patch script:
 | `environment-skeleton/apply-el9-hiera.sh` | `src/assets/environment/dist` |
 | `rsync-skeleton/apply-el9-rsync.sh` | `src/assets/rsync_data/dist` |
 | `modules/apply-el9-module-patches.sh` | `src/puppet/modules/{clamav,dhcp,freeradius,simp_apache,iptables}/dist` |
+| `gpgkeys/apply-el9-gpgkeys.sh` | `src/assets/gpgkeys/dist` |
+
+## Signing with a long-term key instead of `dev`
+
+`build:auto`'s 5th argument is the signing key name. `dev` generates a
+**14-day** throwaway (`Expire-Date: 2w`, hardcoded in
+`simp-rake-helpers/lib/simp/local_gpg_signing_key.rb`) and copies its public key
+to the ISO root -- fine for testing, wrong for production media.
+
+For a long-term key, create `<build_keys_dir>/<name>/` as a GPG homedir holding
+the secret key, an exported `RPM-GPG-KEY-*`, a `gengpgkey` file carrying at
+least `Name-Email:` (that is what the signer matches on), and the passphrase in
+either `gengpgkey`'s `Passphrase:` line or a sibling `password` file.
+`build_keys_dir` defaults to `.dev_gpgkeys` and is gitignored, so the key never
+reaches the repository -- **and therefore is not backed up by it**.
+
+Then build with that name:
+
+    bundle exec rake "build:auto[<iso>,6.7,/build/SIMP_ISO,false,prod]"
+
+Three things bite when switching away from `dev`:
+
+1. **Existing RPMs are still signed by the old key** and `pkg:checksig` rejects
+   them (`ERROR: Untrusted RPMs found in the repository`). Force a re-sign
+   first, and note the default `rpm_dir` is `build/SIMP/*RPMS`, which is *not*
+   where the distribution RPMs live:
+
+       bundle exec rake "pkg:signrpms[prod,/build/simp-core/build/distributions/RedHat/9/x86_64/SIMP/*RPMS,true]"
+
+2. **`key_prep` deletes `RPM-GPG-KEY-SIMP*` from the ISO root** for a non-dev
+   key instead of copying it there, and `checksig` only globs the DVD root
+   non-recursively. The public key must go in the gpgkeys asset --
+   `gpgkeys/apply-el9-gpgkeys.sh` does this. That directory also becomes
+   `SimpRepos/GPGKEYS` on the ISO, which `%post` copies to
+   `/var/www/yum/SIMP/GPGKEYS` and imports, so one placement satisfies both.
+
+3. **Check the right signature field.** On EL9's rpm, `%{SIGPGP:pgpsig}` reads
+   `(none)` on a perfectly signed package -- the signature lives in
+   `%{RSAHEADER:pgpsig}`. Verify with:
+
+       rpm -qp --qf '%{RSAHEADER:pgpsig}\n' <rpm>
 
 Then verify the RPM actually contains the change before building the ISO:
 
