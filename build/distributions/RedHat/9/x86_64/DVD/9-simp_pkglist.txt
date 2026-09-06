@@ -788,3 +788,27 @@ initscripts
 postgresql-server
 postgresql
 postgresql-private-libs
+
+# --- Requested by simp_ks_base but pruned away -------------------------------
+# These four are in the kickstart's %packages list, so anaconda asks for them
+# at install time -- but they were never added HERE, so the prune removed them
+# from the media and the install stopped with 'missing packages'.
+#
+#   lvm2, device-mapper-persistent-data  LVM userspace (the layout is LVM-on-LUKS)
+#   grub2-tools-extra                    grub tooling
+#   nvme-cli                             NVMe-backed disks
+#
+# Listed with their dependency closure, resolved iteratively against the
+# RHEL 9.8 DVD (4 rounds to converge, 7 MB total).
+device-mapper-event
+device-mapper-event-libs
+device-mapper-persistent-data
+freetype
+graphite2
+grub2-tools-extra
+harfbuzz
+libnvme
+libpng
+lvm2
+lvm2-libs
+nvme-cli

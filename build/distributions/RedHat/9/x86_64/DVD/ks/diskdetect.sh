@@ -139,12 +139,21 @@ volgroup VolGroup00 pv.01
 # NOTE: /var/tmp is NOT a logical volume. simp::mountpoints::tmp mounts TmpVol a
 # second time at /var/tmp after install, so /tmp and /var/tmp share this 15G.
 #
-# Fixed volumes total 123G, so this layout needs roughly a 130GB minimum disk.
+# IMPORTANT: on a --grow volume, --size is the MINIMUM, not "the remainder".
+# Anaconda must be able to satisfy the sum of every --size before it grows
+# anything, so /var's floor is deliberately small (4G). With /var at 40960 the
+# minimums summed to 163G against ~158.6G of VG on a 160GB disk and the install
+# died with:
+#     "new lv is too large to fit in free space"
+#
+# Sum of minimums: 8 + 60 + 15 + 15 + 4 + 20 + 5 = 127G, so this fits any disk
+# of roughly 130GB or more. /var then grows into whatever is left -- about 35G
+# on a 160GB disk, more on larger ones.
 logvol swap --fstype=swap --name=SwapVol --vgname=VolGroup00 --size=8192
 logvol / --fstype=ext4 --name=RootVol --vgname=VolGroup00 --size=61440 --fsoptions=iversion
 logvol /tmp --fstype=ext4 --name=TmpVol --vgname=VolGroup00 --size=15360 --fsoptions=nosuid,noexec,nodev
 logvol /home --fstype=ext4 --name=HomeVol --vgname=VolGroup00 --size=15360 --fsoptions=nosuid,noexec,nodev,iversion
-logvol /var --fstype=ext4 --name=VarVol --vgname=VolGroup00 --size=40960 --grow
+logvol /var --fstype=ext4 --name=VarVol --vgname=VolGroup00 --size=4096 --grow
 logvol /var/log --fstype=ext4 --name=VarLogVol --vgname=VolGroup00 --size=20480 --fsoptions=nosuid,noexec,nodev
 logvol /var/log/audit --fstype=ext4 --name=VarLogAuditVol --vgname=VolGroup00 --size=5120 --fsoptions=nosuid,noexec,nodev
 EOF
