@@ -1,0 +1,527 @@
+# SIMP 6.7.0 / RHEL 9.8 -- EL9 component pin set
+#
+# Generated for the RHEL 9 release effort (branch 6.7.0-RHEL-9.8).
+# Base: upstream simp-core master @ 7f1409b, Puppetfile.pinned (EL8/6.6.0-2 era).
+#
+# SELECTION POLICY
+#   Each component is pinned to its newest tag that declares EL9 support.
+#   Where no tag declares EL9, the newest tag is used and annotated inline.
+#
+#   Upper version bounds in module metadata.json are NOT treated as binding.
+#   They are release-time bookkeeping that lags reality: SIMP's own CI
+#   (see any module's .fixtures.yml) tests every component against the
+#   DEFAULT BRANCH of its dependencies, not against these bounds. Example:
+#   haveged 0.15.0 (2024-09) caps simplib < 5.0.0, while simplib 7.0.1
+#   (2026-08) is the current EL9 release and is what CI actually exercises.
+#   Honouring those bounds would demote simplib to a non-EL9 version.
+#
+#   Known stale bounds are catalogued in docs/el9-stale-version-bounds.md
+#   and are handled at RPM-build time via build/rpm/dependencies.yaml.
+#
+# TWO COMPONENTS ARE PINNED BY COMMIT, NOT TAG
+#   simp-adapter and rubygem-simp-cli carry their OpenVox/EL9 support only
+#   on master; their newest tags (2.1.1 and 7.0.0/2021) predate OpenVox
+#   entirely. Both are essential to the EL9 install path, so they are
+#   pinned to reviewed SHAs. Re-pin to tags once upstream cuts releases.
+#
+moduledir 'src'
+
+mod 'simp-doc',
+  :git => 'https://github.com/simp/simp-doc',
+  :branch => 'master'
+
+moduledir 'src/assets'
+
+# NOTE: OpenVox support is on master, UNTAGGED (last tag 7.0.0, 2021).
+mod 'rubygem-rubygem_simp_cli',
+  :git => 'https://github.com/simp/rubygem-simp-cli',
+  :ref => '6ada8ef33f'
+
+mod 'simp-rsync_data',
+  :git => 'https://github.com/simp/simp-rsync-skeleton',
+  :tag => '7.1.1'
+
+# Use old name of rsync module for pre64 so its name does
+# not conflict with the name in rsync_data during puppetfile
+# checks in travis and gitlab
+mod 'simp-rsync_data_pre64',
+  :git => 'https://github.com/simp/simp-rsync',
+  :tag => '6.2.1-2'
+
+# NOTE: Ruby 4.0/OpenVox + EL8-10 support is on master, UNTAGGED (last tag 2.1.1).
+mod 'simp-adapter',
+  :git => 'https://github.com/simp/simp-adapter',
+  :ref => 'a08a14fc76'
+
+mod 'simp-environment',
+  :git => 'https://github.com/simp/simp-environment-skeleton',
+  :tag => '7.3.1'
+
+mod 'simp-gpgkeys',
+  :git => 'https://github.com/simp/simp-gpgkeys',
+  :tag => '3.2.0'
+
+mod 'simp-simp_selinux_policy',
+  :git => 'https://github.com/simp/simp-selinux-policy',
+  :tag => '1.1.1'
+
+mod 'simp-utils',
+  :git => 'https://github.com/simp/simp-utils',
+  :tag => '6.8.2'
+
+# TEMPORARILY EXCLUDED -- MUST BE RESTORED BEFORE THE ISO IS USABLE
+#
+# WARNING: an earlier revision of this comment claimed omitting r10k was safe
+# because no RPM Requires it. That is true of the RPM metadata and false in
+# practice: `simp config` deploys every Puppet module by shelling out to r10k
+# (simp-cli, lib/simp/cli/environment/puppet_dir_env.rb) --
+#
+#     r10k = '/usr/share/simp/bin/r10k' if File.executable?(...)
+#     r10k_cmd = "#{r10k} puppetfile install -v info"
+#
+# -- so without it `simp config` dies on that line and NOTHING can be deployed.
+# Confirmed on the 10.20.31.131 test install. See docs/el9-bootstrap-blockers.md.
+#
+# Two things block a straight rebuild of the upstream component:
+#   1. Gemfile pins r10k 3.11 (gemspec: ruby ~> 2.3) and puppet ~> 6.2, so
+#      `bundle install` cannot resolve on the EL9 build host (Ruby 3.3).
+#   2. Rakefile calls ERB.new(tmpl, nil, '-'); the 3-arg form was removed in
+#      Ruby 3.1 and must become ERB.new(tmpl, trim_mode: '-').
+#
+# r10k 5.0.3 runs correctly on OpenVox's Ruby 3.2.11. Only 12 pure-Ruby gems
+# need vendoring (OpenVox's Ruby supplies the other 16 in the closure, including
+# every gem with a native extension), so BuildArch: noarch still holds.
+#
+# mod 'simp-vendored_r10k',
+#   :git => 'https://github.com/simp/pkg-r10k',
+#   :tag => '3.14.2-1'
+
+moduledir 'src/puppet/modules'
+
+mod 'puppet-kmod',
+  :git => 'https://github.com/simp/pupmod-voxpupuli-kmod.git',
+  :tag => 'v5.0.0'
+
+mod 'puppet-systemd',
+  :git => 'https://github.com/simp/pupmod-voxpupuli-systemd',
+  :tag => 'v9.4.0'
+
+mod 'herculesteam-augeasproviders_core',
+  :git => 'https://github.com/simp/augeasproviders_core',
+  :tag => 'v5.0.0'
+
+mod 'herculesteam-augeasproviders_grub',
+  :git => 'https://github.com/simp/augeasproviders_grub',
+  :tag => 'v6.0.0'
+
+mod 'herculesteam-augeasproviders_ssh',
+  :git => 'https://github.com/simp/augeasproviders_ssh',
+  :tag => 'v7.0.0'
+
+mod 'herculesteam-augeasproviders_sysctl',
+  :git => 'https://github.com/simp/augeasproviders_sysctl',
+  :tag => 'v4.1.0'
+
+mod 'simp-gpasswd',
+  :git => 'https://github.com/simp/puppet-gpasswd',
+  :tag => '2.0.0'
+
+# ADDED FOR EL9: required by simp/pam 9.2.0, which introduced an authselect
+# dependency. There is no simp/ fork, so this tracks Vox Pupuli directly.
+mod 'puppet-authselect',
+  :git => 'https://github.com/voxpupuli/puppet-authselect',
+  :tag => '1.1.2'
+
+# ADDED FOR EL9: required by puppet/firewalld 5.1.0 (>= 1.5.0 < 2.0.0).
+mod 'puppetlabs-augeas_core',
+  :git => 'https://github.com/simp/pupmod-puppetlabs-augeas_core',
+  :tag => 'v1.5.0'
+
+mod 'puppetlabs-apache',
+  :git => 'https://github.com/simp/puppetlabs-apache',
+  :tag => 'v13.1.0'
+
+mod 'puppetlabs-concat',
+  :git => 'https://github.com/simp/puppetlabs-concat',
+  :tag => 'v10.0.0'
+
+# NOTE: HOCON parser; no OS-specific code. Upstream metadata is stale.
+mod 'puppetlabs-hocon',
+  :git => 'https://github.com/simp/pupmod-puppetlabs-hocon',
+  :tag => 'v2.0.0'
+
+mod 'puppetlabs-inifile',
+  :git => 'https://github.com/simp/puppetlabs-inifile',
+  :tag => 'v6.4.0'
+
+mod 'puppetlabs-java',
+  :git => 'https://github.com/simp/puppetlabs-java',
+  :tag => 'v11.2.0'
+
+mod 'puppetlabs-motd',
+  :git => 'https://github.com/simp/puppetlabs-motd',
+  :tag => 'v7.3.0'
+
+mod 'puppetlabs-postgresql',
+  :git => 'https://github.com/simp/puppetlabs-postgresql',
+  :tag => 'v10.6.1'
+
+# NOTE: PuppetDB 8 series, required by OpenVox 8. Upstream metadata is stale.
+mod 'puppetlabs-puppetdb',
+  :git => 'https://github.com/simp/pupmod-puppetlabs-puppetdb',
+  :tag => 'v8.1.0'
+
+# NOTE: Manages auth.conf only; no OS-specific code. Upstream metadata is stale.
+mod 'puppetlabs-puppet_authorization',
+  :git => 'https://github.com/simp/pupmod-puppetlabs-puppet_authorization',
+  :tag => 'v1.0.0'
+
+# NOTE: Bolt task helper; no OS-specific code. Not a simp-core dependency.
+mod 'puppetlabs-ruby_task_helper',
+  :git => 'https://github.com/simp/pupmod-puppetlabs-ruby_task_helper.git',
+  :tag => '1.0.0'
+
+mod 'puppetlabs-stdlib',
+  :git => 'https://github.com/simp/puppetlabs-stdlib',
+  :tag => 'v10.0.0'
+
+# NOTE: DEPRECATED upstream (absorbed into stdlib). Not a simp-core dependency.
+mod 'puppetlabs-translate',
+  :git => 'https://github.com/simp/pupmod-puppetlabs-translate',
+  :tag => 'v2.2.0'
+
+# NOTE: Not a simp-core dependency. Debian-focused upstream.
+mod 'saz-locales',
+  :git => 'https://github.com/simp/pupmod-saz-locales',
+  :tag => 'v5.0.0'
+
+mod 'saz-timezone',
+  :git => 'https://github.com/simp/pupmod-saz-timezone',
+  :tag => 'v7.0.0'
+
+mod 'simp-acpid',
+  :git => 'https://github.com/simp/pupmod-simp-acpid',
+  :tag => '2.0.2'
+
+mod 'simp-aide',
+  :git => 'https://github.com/simp/pupmod-simp-aide',
+  :tag => '9.0.2'
+
+mod 'simp-at',
+  :git => 'https://github.com/simp/pupmod-simp-at',
+  :tag => '2.0.1'
+
+mod 'simp-auditd',
+  :git => 'https://github.com/simp/pupmod-simp-auditd',
+  :tag => '10.1.2'
+
+mod 'simp-autofs',
+  :git => 'https://github.com/simp/pupmod-simp-autofs',
+  :tag => '8.0.1'
+
+mod 'simp-clamav',
+  :git => 'https://github.com/simp/pupmod-simp-clamav',
+  :tag => '7.0.2'
+
+mod 'simp-compliance_markup',
+  :git => 'https://github.com/simp/pupmod-simp-compliance_markup',
+  :tag => '4.0.1'
+
+mod 'simp-cron',
+  :git => 'https://github.com/simp/pupmod-simp-cron',
+  :tag => '2.0.1'
+
+mod 'simp-crypto_policy',
+  :git => 'https://github.com/simp/pupmod-simp-crypto_policy',
+  :tag => '3.0.1'
+
+mod 'simp-dconf',
+  :git => 'https://github.com/simp/pupmod-simp-dconf',
+  :tag => '2.0.1'
+
+mod 'simp-deferred_resources',
+  :git => 'https://github.com/simp/pupmod-simp-deferred_resources',
+  :tag => '1.0.2'
+
+mod 'simp-dhcp',
+  :git => 'https://github.com/simp/pupmod-simp-dhcp',
+  :tag => '8.0.2'
+
+mod 'simp-ds389',
+  :git => 'https://github.com/simp/pupmod-simp-ds389',
+  :tag => '2.0.1'
+
+mod 'simp-fips',
+  :git => 'https://github.com/simp/pupmod-simp-fips',
+  :tag => '2.0.2'
+
+mod 'simp-freeradius',
+  :git => 'https://github.com/simp/pupmod-simp-freeradius',
+  :tag => '9.0.2'
+
+mod 'simp-gdm',
+  :git => 'https://github.com/simp/pupmod-simp-gdm',
+  :tag => '8.1.2'
+
+mod 'simp-gnome',
+  :git => 'https://github.com/simp/pupmod-simp-gnome',
+  :tag => '10.0.2'
+
+mod 'simp-haveged',
+  :git => 'https://github.com/simp/pupmod-simp-haveged',
+  :tag => '0.15.0'
+
+mod 'simp-ima',
+  :git => 'https://github.com/simp/pupmod-simp-ima',
+  :tag => '1.0.3'
+
+# NOTE: iptables 9.x violates simp.optional_dependencies bounds asserted at
+# compile time by krb5, nfs, postfix, rsyslog, simp_snmpd, ssh and vsftpd
+# (>= 6.5.3 < 9.0.0).
+mod 'simp-iptables',
+  :git => 'https://github.com/simp/pupmod-simp-iptables',
+  :tag => '8.0.4'
+
+mod 'simp-issue',
+  :git => 'https://github.com/simp/pupmod-simp-issue',
+  :tag => '1.0.1'
+
+mod 'simp-krb5',
+  :git => 'https://github.com/simp/pupmod-simp-krb5',
+  :tag => '8.0.2'
+
+mod 'simp-libreswan',
+  :git => 'https://github.com/simp/pupmod-simp-libreswan',
+  :tag => '5.0.0'
+
+mod 'simp-libvirt',
+  :git => 'https://github.com/simp/pupmod-simp-libvirt',
+  :tag => '6.0.2'
+
+mod 'simp-logrotate',
+  :git => 'https://github.com/simp/pupmod-simp-logrotate',
+  :tag => '7.0.2'
+
+mod 'simp-mate',
+  :git => 'https://github.com/simp/pupmod-simp-mate',
+  :tag => '2.0.1'
+
+mod 'simp-mozilla',
+  :git => 'https://github.com/simp/pupmod-simp-mozilla',
+  :tag => '6.0.1'
+
+mod 'simp-named',
+  :git => 'https://github.com/simp/pupmod-simp-named',
+  :tag => '7.0.2'
+
+mod 'simp-nfs',
+  :git => 'https://github.com/simp/pupmod-simp-nfs',
+  :tag => '8.0.1'
+
+mod 'simp-oath',
+  :git => 'https://github.com/simp/pupmod-simp-oath',
+  :tag => '1.0.2'
+
+mod 'simp-oddjob',
+  :git => 'https://github.com/simp/pupmod-simp-oddjob',
+  :tag => '3.0.2'
+
+mod 'simp-openscap',
+  :git => 'https://github.com/simp/pupmod-simp-openscap',
+  :tag => '7.0.2'
+
+mod 'simp-pam',
+  :git => 'https://github.com/simp/pupmod-simp-pam',
+  :tag => '9.2.0'
+
+mod 'simp-pki',
+  :git => 'https://github.com/simp/pupmod-simp-pki',
+  :tag => '7.0.2'
+
+mod 'simp-polkit',
+  :git => 'https://github.com/simp/pupmod-simp-polkit',
+  :tag => '7.0.2'
+
+mod 'simp-postfix',
+  :git => 'https://github.com/simp/pupmod-simp-postfix',
+  :tag => '7.0.2'
+
+mod 'simp-pupmod',
+  :git => 'https://github.com/simp/pupmod-simp-pupmod',
+  :tag => '12.3.0'
+
+mod 'simp-resolv',
+  :git => 'https://github.com/simp/pupmod-simp-resolv',
+  :tag => '1.0.2'
+
+mod 'simp-rsync',
+  :git => 'https://github.com/simp/pupmod-simp-rsync',
+  :tag => '8.0.1'
+
+# NOTE: rsyslog 10.x violates simp.optional_dependencies bounds asserted at
+# compile time by aide, auditd, simp_snmpd and tlog (>= 7.6.0 < 10.0.0).
+mod 'simp-rsyslog',
+  :git => 'https://github.com/simp/pupmod-simp-rsyslog',
+  :tag => '9.2.0'
+
+mod 'simp-selinux',
+  :git => 'https://github.com/simp/pupmod-simp-selinux',
+  :tag => '4.0.1'
+
+mod 'simp-simp',
+  :git => 'https://github.com/simp/pupmod-simp-simp',
+  :tag => '9.0.1'
+
+mod 'simp-simpkv',
+  :git => 'https://github.com/simp/pupmod-simp-simpkv',
+  :tag => '1.0.1'
+
+mod 'simp-simplib',
+  :git => 'https://github.com/simp/pupmod-simp-simplib',
+  :tag => '7.0.1'
+
+mod 'simp-simp_apache',
+  :git => 'https://github.com/simp/pupmod-simp-simp_apache',
+  :tag => '9.0.2'
+
+mod 'simp-simp_banners',
+  :git => 'https://github.com/simp/pupmod-simp-simp_banners',
+  :tag => '1.0.1'
+
+mod 'simp-simp_ds389',
+  :git => 'https://github.com/simp/pupmod-simp-simp_ds389',
+  :tag => '2.0.1'
+
+# NOTE: simp_firewalld 3.x violates the bound asserted by simp-iptables 8.0.4
+# (simp/simp_firewalld < 3.0.0), which dnf enforces at install time. 8.0.4 is
+# itself required because krb5/nfs/postfix/rsyslog/simp_snmpd/ssh/vsftpd assert
+# simp/iptables < 9.0.0. 2.0.3 is EL9-capable and is the matching pair.
+mod 'simp-simp_firewalld',
+  :git => 'https://github.com/simp/pupmod-simp-simp_firewalld',
+  :tag => '2.0.3'
+
+mod 'simp-simp_gitlab',
+  :git => 'https://github.com/simp/pupmod-simp-simp_gitlab',
+  :tag => '1.0.1'
+
+mod 'simp-simp_grub',
+  :git => 'https://github.com/simp/pupmod-simp-simp_grub',
+  :tag => '2.0.1'
+
+mod 'simp-simp_nfs',
+  :git => 'https://github.com/simp/pupmod-simp-simp_nfs',
+  :tag => '2.0.1'
+
+mod 'simp-simp_options',
+  :git => 'https://github.com/simp/pupmod-simp-simp_options',
+  :tag => '3.0.1'
+
+mod 'simp-simp_rsyslog',
+  :git => 'https://github.com/simp/pupmod-simp-simp_rsyslog',
+  :tag => '1.0.1'
+
+mod 'simp-simp_snmpd',
+  :git => 'https://github.com/simp/pupmod-simp-simp_snmpd',
+  :tag => '2.0.1'
+
+mod 'simp-ssh',
+  :git => 'https://github.com/simp/pupmod-simp-ssh',
+  :tag => '9.1.0'
+
+mod 'simp-sssd',
+  :git => 'https://github.com/simp/pupmod-simp-sssd',
+  :tag => '10.1.2'
+
+mod 'simp-stunnel',
+  :git => 'https://github.com/simp/pupmod-simp-stunnel',
+  :tag => '9.0.2'
+
+mod 'simp-sudo',
+  :git => 'https://github.com/simp/pupmod-simp-sudo',
+  :tag => '7.0.0'
+
+mod 'simp-svckill',
+  :git => 'https://github.com/simp/pupmod-simp-svckill',
+  :tag => '5.1.1'
+
+mod 'simp-swap',
+  :git => 'https://github.com/simp/pupmod-simp-swap',
+  :tag => '1.0.2'
+
+mod 'simp-tftpboot',
+  :git => 'https://github.com/simp/pupmod-simp-tftpboot',
+  :tag => '8.0.1'
+
+mod 'simp-tlog',
+  :git => 'https://github.com/simp/pupmod-simp-tlog',
+  :tag => '1.0.1'
+
+mod 'simp-tpm2',
+  :git => 'https://github.com/simp/pupmod-simp-tpm2',
+  :tag => '1.0.2'
+
+mod 'simp-tuned',
+  :git => 'https://github.com/simp/pupmod-simp-tuned',
+  :tag => '1.0.2'
+
+mod 'simp-useradd',
+  :git => 'https://github.com/simp/pupmod-simp-useradd',
+  :tag => '3.1.2'
+
+mod 'simp-vnc',
+  :git => 'https://github.com/simp/pupmod-simp-vnc',
+  :tag => '8.0.2'
+
+# We have forked voxpupuli/selinux temporarily, renaming
+# their selinux namespace to vox_selinux.  This change
+# allows us to use their module in simp/selinux, as its
+# capabililites are orthogonal to simp/selinux.  The long
+# term plan is to get our functionality merged into
+# voxpupuli/selinux.
+# Our changes are on simp-master.
+mod 'simp-vox_selinux',
+  :git => 'https://github.com/simp/pupmod-voxpupuli-selinux',
+  :tag => 'simp-6.0.0'
+
+mod 'simp-vsftpd',
+  :git => 'https://github.com/simp/pupmod-simp-vsftpd',
+  :tag => '9.0.2'
+
+mod 'simp-x2go',
+  :git => 'https://github.com/simp/pupmod-simp-x2go',
+  :tag => '1.0.2'
+
+mod 'treydock-kdump',
+  :git => 'https://github.com/simp/pupmod-treydock-kdump',
+  :tag => 'v2.0.4'
+
+# NOTE: repo archived
+mod 'trlinkin-nsswitch',
+  :git => 'https://github.com/simp/pupmod-trlinkin-nsswitch',
+  :tag => 'simp-2.3.0'
+
+mod 'voxpupuli-chrony',
+  :git => 'https://github.com/simp/pupmod-voxpupuli-chrony',
+  :tag => 'v5.0.0'
+
+mod 'voxpupuli-firewalld',
+  :git => 'https://github.com/simp/pupmod-voxpupuli-firewalld',
+  :tag => 'v5.1.0'
+
+mod 'voxpupuli-posix_acl',
+  :git => 'https://github.com/simp/pupmod-voxpupuli-posix_acl',
+  :tag => 'v3.1.0'
+
+mod 'voxpupuli-gitlab',
+  :git => 'https://github.com/simp/puppet-gitlab.git',
+  :tag => 'v11.0.0'
+
+mod 'voxpupuli-snmp',
+  :git => 'https://github.com/simp/pupmod-voxpupuli-snmp',
+  :tag => 'v7.3.0'
+
+mod 'voxpupuli-yum',
+  :git => 'https://github.com/simp/pupmod-voxpupuli-yum',
+  :tag => 'v8.0.0'
+
+# vi:syntax=ruby
