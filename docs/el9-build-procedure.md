@@ -103,9 +103,21 @@ remove its `dist/` or the build will silently reuse the stale RPM:
 
 Then confirm the change actually landed in the RPM before building the ISO:
 
-    tar -xOf src/assets/rubygem_simp_cli/dist/rubygem-simp-cli-*.el9.noarch.rpm \
-      ./usr/share/simp/ruby/gems/simp-cli-*/lib/simp/cli/commands/bootstrap.rb \
+    rpm2cpio src/assets/rubygem_simp_cli/dist/rubygem-simp-cli-*.el9.noarch.rpm \
+      | cpio -i --quiet --to-stdout '*/lib/simp/cli/commands/bootstrap.rb' \
       | grep -c 'pre-JEP-223'          # expect 1, not 0
+
+## Two more stale-artifact traps
+
+* **The DVD_Overlay tarball.** `build:auto` reuses an existing
+  `DVD_Overlay/SIMP-*.tar.gz` instead of rebuilding it, so a freshly rebuilt RPM
+  will not reach the ISO unless the tarball is removed first:
+
+      rm -rf build/distributions/RedHat/9/x86_64/DVD_Overlay /build/SIMP_ISO_STAGING
+
+* **`SIMP_BUILD_checkout=no` is load-bearing.** Without it `build:auto` runs
+  `deps:checkout`, which wipes `src/assets` and silently discards every patch
+  from `build/el9-patches/simp-cli/`.
 
 ## Status
 
