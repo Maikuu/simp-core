@@ -40,6 +40,12 @@ is the AlmaLinux 9.8 VM at `10.20.31.130` (`/build`, a dedicated 500 GB XFS disk
 
     export SIMP_RPM_dist=.el9 SIMP_BUILD_distro=RedHat,9,x86_64 LANG=en_US.UTF-8
     bundle exec rake 'deps:checkout[el9]'
+
+    # REQUIRED: three simp-cli defects that only bite on EL9 (blockers 1, 1b, 11).
+    # MUST run after deps:checkout -- it wipes src/assets -- and before pkg:aux,
+    # which is what packages the gem into rubygem-simp-cli.
+    bash build/el9-patches/simp-cli/apply-el9-simp-cli.sh
+
     bundle exec rake 'pkg:key_prep[dev]'    # dev signing key; expires in 14 days
     bundle exec rake pkg:modules
     bundle exec rake pkg:aux
@@ -85,9 +91,29 @@ SimpRepos/SIMP 113, SimpRepos/puppet 4.
 packages, resolved against the DVD. Regenerate after changing the component set —
 see `docs/el9-phase4-iso.md` for the exact dnf invocation.
 
-## Not yet proven
+## Rebuilding a single asset RPM
 
-The ISO has never been booted. `simp config` and `simp bootstrap` are untested.
+`require_rebuild?` does not notice edited component sources, and the documented
+`SIMP_BUILD_PKG_require_rebuild` override is dead code (`ENV.select` returns a
+Hash, and `Hash =~ Regexp` is always nil). After patching a component you must
+remove its `dist/` or the build will silently reuse the stale RPM:
+
+    rm -rf src/assets/rubygem_simp_cli/dist
+    bundle exec rake pkg:aux
+
+Then confirm the change actually landed in the RPM before building the ISO:
+
+    tar -xOf src/assets/rubygem_simp_cli/dist/rubygem-simp-cli-*.el9.noarch.rpm \
+      ./usr/share/simp/ruby/gems/simp-cli-*/lib/simp/cli/commands/bootstrap.rb \
+      | grep -c 'pre-JEP-223'          # expect 1, not 0
+
+## Status
+
+The ISO boots and installs. `simp config` and `simp bootstrap` have both been
+run to completion on EL9 (bootstrap RC=0, puppetserver on 8140, 389-DS up), but
+only on a host where blockers 1, 1b and 11 were patched **by hand**. The first
+ISO carrying those three fixes in `rubygem-simp-cli` still needs a clean
+end-to-end install.
 The likeliest next failures are in `auto.cfg`'s `%post`: FIPS enablement (EL9 uses
 `crypto-policies-scripts`/`fips-mode-setup`, and `fipscheck` no longer exists) and
 `simp_filesystem.repo` generation.

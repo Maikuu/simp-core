@@ -102,6 +102,14 @@ nvme-cli
 -rhc
 -subscription-manager-cockpit
 -subscription-manager-rhsm-certificates
+# Not shipped on this media at all (removed from 9-simp_pkglist.txt) -- this
+# site hosts its own repos and never registers with an entitlement server.
+# Listed here too so the intent is visible at the install list.
+-libdnf-plugin-subscription-manager
+-python3-subscription-manager-rhsm
+-python3-cloud-what
+-insights-core
+-insights-core-selinux
 -sysklogd
 -yum-rhn-plugin
 %end

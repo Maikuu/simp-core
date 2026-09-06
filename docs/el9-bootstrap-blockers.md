@@ -68,6 +68,10 @@ reports "ready to handle requests".
 This is an upstream `simp/rubygem-simp-cli` bug and affects any EL8 host that
 has been moved to a newer JDK, not just EL9.
 
+**Shipped by** `build/el9-patches/simp-cli/apply-el9-simp-cli.sh` (patch 1). It
+was originally proven by hand on the test host; the patch script is what puts it
+into the `rubygem-simp-cli` RPM on the ISO.
+
 ---
 
 ## 1b. `simp bootstrap` can never see a healthy puppetserver  (BLOCKER)
@@ -143,6 +147,8 @@ is not usable here.
 Separately, `puppetserver_running?` should not `rescue StandardError` silently
 in the retry loop -- five minutes of a hidden `EOFError` is what made this cost
 hours instead of minutes.
+
+**Shipped by** `build/el9-patches/simp-cli/apply-el9-simp-cli.sh` (patch 2).
 
 ---
 
@@ -652,6 +658,52 @@ so if those ipsets are not restored before the zone activates at boot, nothing
 matches and the DROP target takes everything. Not confirmed -- firewalld was
 stopped before it could be checked -- but worth knowing that the shipped
 firewalld default can lock a machine out on first reboot.
+
+---
+
+## 11. `network::eth` does not exist on EL9  (BLOCKER)
+
+`simp config` dies partway through the questionnaire:
+
+```
+>> Applying: Configure a network interface...
+[FACTER_ipaddress=XXX puppet apply --modulepath=... -e "network::eth{'ens18':
+  bootproto => 'none', onboot => true, ipaddr => '10.20.31.132', ... }"]
+  failed with exit status 1:
+  Error: Evaluation Error: Error while evaluating a Resource Statement,
+  Unknown resource type: 'network::eth' (line: 1, column: 1) on node puppet.mnt.dev
+ Failed
+Configuration of ens18 network interface failed
+```
+
+`pupmod-simp-network` is not in the EL9 pin set -- RHEL 9 removed the
+`network-scripts` package whose `ifcfg-*` files `network::eth` writes. Confirmed
+absent from the pin set, from `src/puppet/modules`, and from the built RPM set.
+
+`ConfigureNetworkAction` sets `@die_on_apply_fail = true`, so this is fatal
+rather than a warning.
+
+**This is not a defaults problem.** `CliSetUpNIC` recommends `'yes'`, but the
+step fails identically whether the answer is accepted or typed by hand -- the
+resource type simply does not exist. Telling the operator to answer `'no'` is a
+workaround, not a fix.
+
+**Fix** (`build/el9-patches/simp-cli/apply-el9-simp-cli.sh`, patch 3):
+
+* `CliSetUpNIC` gains `network_module_available?`, which tests the modulepath
+  (plus `SIMP_MODULES_INSTALL_PATH`) for `network/manifests`. When the module is
+  absent it sets `@skip_query = true` and recommends `'no'`, so the question is
+  never asked and the trap cannot be walked into.
+* `ConfigureNetworkAction#apply` makes the same check and returns
+  `:unnecessary` -- a non-error status that bypasses the `die_on_apply_fail`
+  raise -- because an answers file can pre-assign `set_up_nic: yes` and reach
+  the action even when the query is skipped.
+
+Nothing is lost by skipping it. The `false` branch of the `network_setup`
+scenario still collects hostname, IP, netmask, gateway and DNS into hieradata;
+it just does not try to re-apply them to a NIC the kickstart already configured.
+
+On EL8, where the module is present, behaviour is unchanged.
 
 ---
 

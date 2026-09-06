@@ -129,9 +129,6 @@ ima-evm-utils
 inih
 initscripts-rename-device
 initscripts-service
-insights-client
-insights-core
-insights-core-selinux
 ipcalc
 iproute
 iproute-tc
@@ -208,7 +205,6 @@ libdaemon
 libdb
 libdhash
 libdnf
-libdnf-plugin-subscription-manager
 libdrm
 libeconf
 libedit
@@ -553,7 +549,6 @@ pupmod-trlinkin-nsswitch
 python3
 python3-audit
 python3-chardet
-python3-cloud-what
 python3-dateutil
 python3-dbus
 python3-decorator
@@ -586,7 +581,6 @@ python3-setools
 python3-setuptools
 python3-setuptools-wheel
 python3-six
-python3-subscription-manager-rhsm
 python3-systemd
 python3-urllib3
 python-unversioned-command
@@ -597,7 +591,6 @@ redhat-indexhtml
 redhat-logos-httpd
 redhat-release
 redhat-release-eula
-rhc
 rootfiles
 rpm
 rpm-build-libs
@@ -652,8 +645,6 @@ sssd-krb5-common
 sssd-ldap
 sssd-proxy
 stunnel
-subscription-manager
-subscription-manager-rhsm-certificates
 sudo
 sysfsutils
 syslinux-tftpboot
@@ -812,3 +803,22 @@ libpng
 lvm2
 lvm2-libs
 nvme-cli
+
+# --- Red Hat subscription / Insights stack: deliberately NOT shipped ----------
+# This site hosts its own repos and never registers with an entitlement server,
+# so none of this is wanted. Removed from the media entirely rather than merely
+# excluded from %packages, because the install-time exclusions in simp_ks_base
+# did not stop `simp bootstrap` pulling the stack back in as dependencies.
+#
+# Dropped: subscription-manager, subscription-manager-rhsm-certificates,
+#          libdnf-plugin-subscription-manager, python3-subscription-manager-rhsm,
+#          python3-cloud-what, insights-client, insights-core,
+#          insights-core-selinux, rhc
+#
+# Verified that nothing else on the media requires any of them -- every
+# dependency was internal to the stack itself.
+#
+# librhsm IS still shipped and must stay: libdnf requires it. It is only a
+# library; without subscription-manager installed nothing uses it, and dnf stops
+# printing "Updating Subscription Management repositories / Unable to read
+# consumer identity" on every transaction.
