@@ -20,6 +20,9 @@
 #   3. network::eth does not exist on EL9 -- pupmod-simp-network is not shipped
 #      because RHEL 9 removed network-scripts. ConfigureNetworkAction sets
 #      die_on_apply_fail, so `simp config` aborts outright.
+#   4. SetHostnameAction shells out to /sbin/ifdown + /sbin/ifup, also gone with
+#      network-scripts, and also die_on_apply_fail. Reachable on EL9 via a
+#      persisted answers file even though patch 3 skips the query.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -60,7 +63,7 @@ patch(
         @java_major_version = (m[1] == '1') ? m[2].to_i : m[1].to_i
       end
 """,
-    '1/3',
+    '1/4',
     'pre-JEP-223',
 )
 
@@ -80,7 +83,7 @@ patch(
         end
       end
 """,
-    '2/3',
+    '2/4',
     'never read\n      # the body',
 )
 
@@ -122,7 +125,7 @@ patch(
       os_value || 'yes'
     end
 """,
-    '3a/3',
+    '3a/4',
     'network_module_available?',
 )
 
@@ -136,7 +139,7 @@ patch(
     """require_relative '../data/cli_network_interface'
 require_relative '../data/cli_network_set_up_nic'
 """,
-    '3b/3',
+    '3b/4',
     'cli_network_set_up_nic',
 )
 
@@ -164,16 +167,61 @@ patch(
 
       dhcp      = get_item('cli::network::dhcp').value
 """,
-    '3c/3',
+    '3c/4',
     "The 'network' Puppet module is not installed",
+)
+
+# ------------------------------------------------------------------ patch 4
+# SetHostnameAction also shells out to network-scripts, and is also fatal.
+patch(
+    'config/items/action/set_hostname_action.rb',
+    """        interface = get_item('cli::network::interface').value
+        info("Restarting #{interface} interface to update domain info")
+        Simp::Cli::Utils.show_wait_spinner do
+          success &&= execute("/sbin/ifdown #{interface}; /sbin/ifup #{interface} && wait && sleep 10")
+        end
+
+        # clear out any old networking-related facts
+        Facter.clear
+""",
+    """        interface = get_item('cli::network::interface').value
+
+        # EL9: RHEL 9 removed the network-scripts package, so /sbin/ifdown and
+        # /sbin/ifup do not exist. This action sets @die_on_apply_fail, so
+        # calling them unconditionally aborts `simp config`. An answers file can
+        # reach this path even on EL9, because cli::network::set_up_nic is a
+        # :cli_params Item and is persisted to ~/.simp/simp_conf.yaml. Prefer
+        # nmcli; if neither exists, say so rather than failing -- this only
+        # refreshes DHCP domain info after a hostname change.
+        if Facter::Core::Execution.which('ifup')
+          info("Restarting #{interface} interface to update domain info")
+          Simp::Cli::Utils.show_wait_spinner do
+            success &&= execute("/sbin/ifdown #{interface}; /sbin/ifup #{interface} && wait && sleep 10")
+          end
+          Facter.clear
+        elsif Facter::Core::Execution.which('nmcli')
+          info("Reapplying #{interface} connection to update domain info")
+          # deliberately not gating success: 'reapply' can fail benignly on some
+          # connection types and must not kill a die_on_apply_fail Item
+          Simp::Cli::Utils.show_wait_spinner do
+            execute("nmcli device reapply #{interface}")
+          end
+          Facter.clear
+        else
+          warn("Neither ifup nor nmcli is available; not restarting #{interface}", [:YELLOW])
+        end
+""",
+    '4/4',
+    'Neither ifup nor nmcli',
 )
 PY
 
 echo
-echo "ruby -c on both files:"
+echo "ruby -c on the patched files:"
 for f in "$CLI/commands/bootstrap.rb" \
          "$CLI/config/items/data/cli_network_set_up_nic.rb" \
-         "$CLI/config/items/action/configure_network_action.rb"; do
+         "$CLI/config/items/action/configure_network_action.rb" \
+         "$CLI/config/items/action/set_hostname_action.rb"; do
   printf '  %-46s ' "$(basename "$f")"
   ruby -c "$f" 2>&1 | tail -1
 done

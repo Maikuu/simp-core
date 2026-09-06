@@ -705,6 +705,35 @@ it just does not try to re-apply them to a NIC the kickstart already configured.
 
 On EL8, where the module is present, behaviour is unchanged.
 
+### 11b. `SetHostnameAction` has the same problem
+
+`network-scripts` took `/sbin/ifup` and `/sbin/ifdown` with it, and
+`SetHostnameAction` calls both to bounce the interface after a hostname change:
+
+```ruby
+success &&= execute("/sbin/ifdown #{interface}; /sbin/ifup #{interface} && wait && sleep 10")
+```
+
+It also sets `@die_on_apply_fail = true`. It only runs on the DHCP path, and it
+is *not* reachable interactively once patch 3 forces the `'no'` branch -- that
+branch has no `CliNetworkDHCP` Item, so `get_item('cli::network::dhcp')` raises
+`MissingItemError`, which is rescued, and the block is skipped.
+
+It **is** reachable from a persisted answers file. `cli::network::set_up_nic` is
+a `:cli_params` Item, so it is written to `~/.simp/simp_conf.yaml`; a rerun
+pre-assigns the value, which bypasses `@skip_query` entirely
+(`determine_value` only consults the default when `@value.nil?`). An interrupted
+run that got as far as answering `yes` will leave exactly that behind.
+
+**Fix** (patch 4): use `ifup` when it exists, else `nmcli device reapply`, else
+warn and carry on. The `nmcli` branch deliberately does not gate `success` --
+`reapply` can fail benignly on some connection types, and this step only
+refreshes DHCP domain info.
+
+Note this is also why `rm -f /root/.simp/simp_conf.yaml` before a fresh
+`simp config` is worth doing regardless: a stale answers file silently overrides
+recommended values that later patches changed.
+
 ---
 
 ## `simp config` notes
