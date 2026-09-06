@@ -98,30 +98,29 @@ Current build:
 
 | | |
 |---|---|
-| built | 2026-09-06 09:32 |
-| size | 3231881216 bytes |
-| sha256 | `30c1eac626cca64e07786eb6d653db7b2d02675a3110a08a2d49e8a468855ac9` |
+| built | 2026-09-06 10:49 |
+| size | 3231883264 bytes |
+| sha256 | `4237daaa3b71efe80bc01d8230388c7c8533a93ff2812dd1bb6889c2b83d1167` |
 | `checkisomd5` | "It is OK to use this media." |
 | boot | `default simp` |
 
-Verified by mounting the ISO and checking the shipped artifacts directly (not
-`dist/`): the four simp-cli fixes in `rubygem-simp-cli`, `chkconfig` and
-`initscripts` in the kickstart's `%packages`, and zero remaining
-`$facts['environment']` occurrences across the `clamav`, `dhcp`, `freeradius`
-and `simp_apache` RPMs.
+Verified on a node installed from this media, with **nothing hand-patched**:
 
-The previous ISO has been installed end to end: `simp config` and
-`simp bootstrap` both completed without hand-patching, which is what surfaced
-blockers 12 and 13. Those two fixes are in this ISO but have only been proven
-by patching the running node, not yet by a fresh install from this media.
+| check | result |
+|---|---|
+| `simp config` + `simp bootstrap` | **0 errors** |
+| two consecutive `puppet agent -t` | **0 errors, 0 changes** |
+| LUKS keyslot PBKDF | `pbkdf2` (was `argon2id`) |
+| `fips-mode-setup --check` | "FIPS mode is enabled." -- no inconsistent state |
+| openvox | `openvox-server` 8.15.2 + `openvox-agent` 8.29.0, puppetserver active on 8140, CA signing |
+| offline | `openvox8-release` not installed; **0** repos pointing at the internet |
+| firewall | `iptables` enabled+active, 21 rules, SSH accept; `service iptables status` exits 0 |
+| NIC question | `(noninteractive) cli::network::set_up_nic = false` -- never asked |
+| packages | `chkconfig`, `initscripts` installed |
+| partitioning | 60G /, 35G /var, 20G /var/log, 4.9G audit, 15G /home |
 
-A node installed from the previous ISO proved blockers 11, 12 and 13 fixed at
-the media level with no hand-patching: `chkconfig`/`initscripts` installed,
-`iptables` active out of the box with 21 rules, `cli::network::set_up_nic =
-false` recorded `(noninteractive)` -- the NIC question was never asked -- and
-`Rsync[site] ... executed successfully`. That install surfaced blocker 14, whose
-fix is in this build but so far proven only on the running node.
-
+Blockers 1, 1b, 4, 4b, 11, 12, 12b, 13 and 14 are all closed and proven from the
+media rather than by patching a running node.
 
 ---
 
