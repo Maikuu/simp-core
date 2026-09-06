@@ -1,0 +1,67 @@
+selinux --permissive
+
+
+%packages
+@^minimal-environment
+%include /tmp/dracut_packages
+acl
+bzip2
+chrony
+dracut
+# fipscheck  # REMOVED: not packaged for EL9
+crypto-policies-scripts
+grub2-efi-x64
+hdparm
+irqbalance
+libaio
+# libhugetlbfs  # REMOVED: not packaged for EL9
+libutempter
+logrotate
+logwatch
+lsof
+mdadm
+net-tools
+netlabel_tools
+pciutils
+psacct
+quota
+# redhat-lsb  # REMOVED: not packaged for EL9
+rsync
+setserial
+shim-x64
+sssd
+sysfsutils
+sysstat
+tmpwatch
+unzip
+usbutils
+vim-enhanced
+wget
+which
+zip
+# Storage tooling required by the kickstart's partitioning layout.
+# These are NOT runtime dependencies of @core/@minimal-environment, so a
+# dependency-closure-derived package list prunes them off the media -- anaconda
+# then aborts with "missing packages: lvm2". diskdetect.sh builds an LVM layout
+# (volgroup/logvol) on ext4 with an EFI partition and optional LUKS.
+lvm2
+device-mapper-persistent-data
+grub2-tools-extra
+nvme-cli
+
+# Don't install these
+-rhn-check
+-rhn-setup
+-rhnsd
+-subscription-manager
+# EL9 pulls these into @minimal-environment/@core and they Require
+# subscription-manager, which SIMP excludes -- the transaction then cannot
+# resolve and anaconda drops to manual software selection. They are Red Hat
+# Insights / subscription telemetry and have no place on a STIG'd, airgapped
+# host, so exclude them explicitly.
+-insights-client
+-rhc
+-subscription-manager-cockpit
+-subscription-manager-rhsm-certificates
+-sendmail
+%end

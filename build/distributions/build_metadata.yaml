@@ -27,11 +27,21 @@
       'arch':
         - 'x86_64'
     '7':
-      'build': true
+      'build': false
       'pkg_type': 'rpm'
       'arch':
         - 'x86_64'
   'RedHat':
+    '9':
+      'build': true
+      'pkg_type': 'rpm'
+      'arch':
+        - 'x86_64'
+    '8':
+      'build': false
+      'pkg_type': 'rpm'
+      'arch':
+        - 'x86_64'
     '6':
       'build': false
       'pkg_type': 'rpm'

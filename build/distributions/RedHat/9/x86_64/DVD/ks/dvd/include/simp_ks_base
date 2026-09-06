@@ -1,0 +1,107 @@
+authselect --enableshadow --passalgo=sha512
+selinux --enforcing
+
+%packages
+acl
+aide
+bzip2
+chrony
+crontabs
+dhcp-client
+# fipscheck  # REMOVED: not packaged for EL9
+crypto-policies-scripts
+firewalld
+libaio
+libutempter
+logrotate
+logwatch
+lsof
+mdadm
+net-snmp
+net-tools
+netlabel_tools
+openssh-clients
+openssh-server
+pciutils
+psacct
+quota
+rsync
+shim-x64
+smartmontools
+sssd
+sysstat
+unzip
+usbutils
+vim-enhanced
+wget
+which
+zip
+
+# Security Related
+%include /tmp/dracut_packages
+cronie-anacron
+cryptsetup
+gnupg2
+netlabel_tools
+stunnel
+tmpwatch
+# vlock  # REMOVED: not packaged for EL9
+
+# Puppet Server Complete Load
+# EL9/SIMP 6.7 uses OpenVox, not Perforce Puppet. The package is
+# 'openvox-server'; nothing in the EL9 repos Provides 'puppetserver',
+# so asking for the old name aborts the install.
+# (openvox-agent DOES Provide 'puppet-agent', so agent deps still resolve.)
+lynx
+git
+openvox-server
+simp
+simp-adapter
+# simp-vendored-r10k is REQUIRED, despite nothing declaring an RPM dependency
+# on it: `simp config` deploys every Puppet module by shelling out to
+# /usr/share/simp/bin/r10k (simp-cli, environment/puppet_dir_env.rb). Without
+# it, `simp config` dies on that line and no module can be deployed.
+# Built by build/el9-patches/vendored-r10k/build-el9.sh.
+simp-vendored-r10k
+xorriso
+syslinux-tftpboot
+yum-utils
+
+# In case of broken repo, these should be installed.
+hdparm
+kbd
+# libhugetlbfs  # REMOVED: not packaged for EL9
+policycoreutils
+rootfiles
+selinux-policy-targeted
+setserial
+sysfsutils
+
+# Storage tooling required by the kickstart's partitioning layout.
+# These are NOT runtime dependencies of @core/@minimal-environment, so a
+# dependency-closure-derived package list prunes them off the media -- anaconda
+# then aborts with "missing packages: lvm2". diskdetect.sh builds an LVM layout
+# (volgroup/logvol) on ext4 with an EFI partition and optional LUKS.
+lvm2
+device-mapper-persistent-data
+grub2-tools-extra
+nvme-cli
+
+# Don't install these
+-rhn-check
+-rhn-setup
+-rhnsd
+-sendmail
+-subscription-manager
+# EL9 pulls these into @minimal-environment/@core and they Require
+# subscription-manager, which SIMP excludes -- the transaction then cannot
+# resolve and anaconda drops to manual software selection. They are Red Hat
+# Insights / subscription telemetry and have no place on a STIG'd, airgapped
+# host, so exclude them explicitly.
+-insights-client
+-rhc
+-subscription-manager-cockpit
+-subscription-manager-rhsm-certificates
+-sysklogd
+-yum-rhn-plugin
+%end

@@ -1,0 +1,32 @@
+---
+# Officially supported SIMP release combinations for the 6.7.0-RHEL-9.8 branch.
+# Other build combinations may work, but unexpected issues may arise.
+#
+# TARGET: Red Hat Enterprise Linux 9.8 Binary DVD.
+#   Customer Portal -> Downloads -> RHEL 9 -> 9.8 -> "Binary DVD"
+#   Requires an active subscription.
+#
+# NOTE: size/checksum below MUST be replaced with the values from the actual
+#       downloaded ISO before building. Get them with:
+#           stat -c %s rhel-9.8-x86_64-dvd.iso
+#           sha256sum  rhel-9.8-x86_64-dvd.iso
+#       and verify the sha256 against the Customer Portal download page.
+simp_releases:
+  6.X:
+    flavors:
+      RedHat:
+        isos:
+          - name:     'rhel-9.8-x86_64-dvd.iso'
+            size:     15540420608
+            checksum: 'c0dd53b73406b85b40d6168d1748e605d71361b2992d282c408b7d7d2e1d2c80'
+        build_command: 'bundle exec rake build:auto[rhel-9.8-x86_64-dvd.iso,6.7]'
+        os_version:   '9.8'
+  '6.7':
+    flavors:
+      RedHat:
+        isos:
+          - name:     'rhel-9.8-x86_64-dvd.iso'
+            size:     15540420608
+            checksum: 'c0dd53b73406b85b40d6168d1748e605d71361b2992d282c408b7d7d2e1d2c80'
+        build_command: 'bundle exec rake build:auto[rhel-9.8-x86_64-dvd.iso,6.7]'
+        os_version:   '9.8'

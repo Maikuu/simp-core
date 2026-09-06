@@ -1,0 +1,4 @@
+# ---
+# example-package-name:
+#   :rpm_name: example-package-name-1.0.0-1.el9.x86_64.rpm
+#   :source: https://yum.server/RedHat/9/x86_64/example-package-name-1.0.0-1.el9.x86_64.rpm
