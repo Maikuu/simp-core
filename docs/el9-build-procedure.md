@@ -123,9 +123,23 @@ Then confirm the change actually landed in the RPM before building the ISO:
 
 The ISO boots and installs. `simp config` and `simp bootstrap` have both been
 run to completion on EL9 (bootstrap RC=0, puppetserver on 8140, 389-DS up), but
-only on a host where blockers 1, 1b and 11 were patched **by hand**. The first
-ISO carrying those three fixes in `rubygem-simp-cli` still needs a clean
-end-to-end install.
+that was on a host where blockers 1, 1b and 11 had been patched **by hand**.
+
+Current build — the first to carry all four simp-cli fixes in the RPM itself:
+
+| | |
+|---|---|
+| built | 2026-09-06 00:06 |
+| size | 3231877120 bytes |
+| sha256 | `6cb26f9b313368b9aec539e01ff03bd8de2444969b775c9cbc852fe4e7b70caa` |
+| `checkisomd5` | "It is OK to use this media." |
+| repos | BaseOS 636, AppStream 259, SimpRepos/SIMP 127, SimpRepos/puppet 4 |
+| boot | `default simp` |
+
+Verified by extracting `rubygem-simp-cli-8.0.0-1.el9.noarch.rpm` **from the
+mounted ISO** (not just from `dist/`) and confirming each fix is present and
+each superseded line is gone. Still needs a clean end-to-end install to prove
+`simp config` runs through without the hand-patching.
 The likeliest next failures are in `auto.cfg`'s `%post`: FIPS enablement (EL9 uses
 `crypto-policies-scripts`/`fips-mode-setup`, and `fipscheck` no longer exists) and
 `simp_filesystem.repo` generation.
