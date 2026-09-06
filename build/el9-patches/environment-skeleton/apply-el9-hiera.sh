@@ -144,6 +144,44 @@ iptables::install::ipv6_package: iptables-nft-services
 iptables::ports:
   22:
     proto: tcp
+
+# --- Never fetch the OpenVox release RPM from the internet ------------------
+#
+# pupmod::master::install has two branches. Without pupmod::openvox_rpm_path it
+# declares a package whose NAME is a vendor URL:
+#
+#   package { 'https://yum.voxpupuli.org/openvox8-release-el-9.noarch.rpm': }
+#
+# That fails on every run, for two independent reasons:
+#
+#  1. simp_options::package_ensure defaults to 'latest', so Puppet runs
+#     `dnf -y upgrade <url>`. dnf will not upgrade a package that is not
+#     installed, so it exits 1 with "No packages marked for upgrade." Setting
+#     ensure to 'installed' would instead make dnf *install* it, over the
+#     internet.
+#  2. These nodes never reach the internet, and the release RPM's only purpose
+#     is to add yum.voxpupuli.org as a repo -- exactly what must not happen on
+#     an air-gapped network. Note the failure is NOT a network block: a test
+#     node reached the vendor fine, so this would appear to "work" on a
+#     connected build/test box and break on a real air-gapped one.
+#
+# Setting openvox_rpm_path takes the other branch, which declares the real
+# package and skips the release RPM entirely:
+#
+#   package { 'openvox-server': ensure => $package_ensure, source => <path> }
+#
+# The path below is the RPM this ISO already bakes into the server's own yum
+# tree, so nothing is fetched. pupmod::master::install is master-only
+# (assert_private, reached via pupmod::master) and that tree exists on the SIMP
+# server, which is the only place the class is evaluated. openvox-server is also
+# in the local 'puppet' repo, so with ensure => latest Puppet resolves the same
+# version already installed and makes no change.
+#
+# Version-pinned because Puppet's package source needs an exact file. Keep it in
+# step with the openvox-server RPM synced in the build (see the "External
+# packages" step in docs/el9-build-procedure.md), or override it per-site once
+# the reposerver exists.
+pupmod::openvox_rpm_path: /var/www/yum/SIMP/RedHat/9/x86_64/puppet/openvox-server-8.15.2-1.el9.noarch.rpm
 YAML
 
 # The per-node layer outranks per-OS, and `simp config` copies these templates

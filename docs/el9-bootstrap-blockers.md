@@ -843,6 +843,66 @@ This is an upstream SIMP bug, not an EL9 one -- it affects any Puppet 8 master.
 
 ---
 
+## 14. `pupmod` fetches the OpenVox release RPM from the internet  (BLOCKER)
+
+12 errors on the first install from ISO, all one cause:
+
+```
+Error: /Stage[main]/Pupmod::Master::Install/Package[https://yum.voxpupuli.org/openvox8-release-el-9.noarch.rpm]/ensure:
+  change from 'purged' to 'latest' failed: Could not update: Execution of
+  '/usr/bin/dnf -y upgrade https://yum.voxpupuli.org/openvox8-release-el-9.noarch.rpm'
+  returned 1: ... No packages marked for upgrade.
+```
+
+`pupmod::master::install` declares a package whose **name is a vendor URL**, and
+`simp_options::package_ensure` defaults to `'latest'`, so Puppet runs
+`dnf -y upgrade <url>`. dnf will not upgrade a package that is not installed, so
+it exits 1. `ensure => 'installed'` would "fix" it only by making dnf *install*
+the RPM over the internet.
+
+**These nodes never reach the internet**, and that release RPM's only purpose is
+to add `yum.voxpupuli.org` as a repo -- precisely what must not happen here.
+
+Note the trap: this is **not** a network failure. A connected test node reached
+the vendor fine (`HTTP/2 200`), so with `ensure => installed` the whole thing
+would appear to work on a connected build/test box and fail on a genuinely
+air-gapped one.
+
+The RPM is also unnecessary. `openvox-server` is already installed **from the
+local repo** the ISO bakes in:
+
+```
+# dnf repoquery --installed --qf "%{name} %{from_repo}" openvox-server
+openvox-server puppet
+```
+
+`/var/www/yum/SIMP/RedHat/9/x86_64/puppet/` ships `openvox-server`,
+`openvox-agent`, `openvoxdb`, `openvoxdb-termini` and the GPG key.
+
+**Fix** -- set `pupmod::openvox_rpm_path` (in `data/RedHat/9.yaml` via
+`build/el9-patches/environment-skeleton/apply-el9-hiera.sh`). That takes the
+other branch of `pupmod::master::install`, which declares the real package and
+skips the release RPM entirely:
+
+```puppet
+package { 'openvox-server': ensure => $package_ensure, source => <path> }
+```
+
+`pupmod::master::install` is master-only (`assert_private`, reached via
+`pupmod::master`), and that yum tree exists on the SIMP server, which is the
+only place the class is evaluated. Because `openvox-server` is also in the local
+`puppet` repo, `ensure => latest` resolves to the version already installed and
+makes no change.
+
+The path is version-pinned, because Puppet's package `source` needs an exact
+file. Keep it in step with the RPM synced by the "External packages" build step,
+or override it per-site once a reposerver exists.
+
+Verified on a node installed from the ISO: **0 errors**, and zero occurrences of
+`voxpupuli` anywhere in the agent run.
+
+---
+
 ## `simp config` notes
 
 `simp config` runs fully non-interactively with `-f -D`, but two things are not
