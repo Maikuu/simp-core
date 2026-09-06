@@ -98,9 +98,9 @@ Current build:
 
 | | |
 |---|---|
-| built | 2026-09-06 09:09 |
-| size | 3231879168 bytes |
-| sha256 | `fa19078252026369309cd4d7e3347dd3f00196b4cfce738eb5258bb6a16d28ee` |
+| built | 2026-09-06 09:32 |
+| size | 3231881216 bytes |
+| sha256 | `30c1eac626cca64e07786eb6d653db7b2d02675a3110a08a2d49e8a468855ac9` |
 | `checkisomd5` | "It is OK to use this media." |
 | boot | `default simp` |
 
@@ -158,7 +158,7 @@ Which `dist/` goes with which patch script:
 | `simp-cli/apply-el9-simp-cli.sh` | `src/assets/rubygem_simp_cli/dist` |
 | `environment-skeleton/apply-el9-hiera.sh` | `src/assets/environment/dist` |
 | `rsync-skeleton/apply-el9-rsync.sh` | `src/assets/rsync_data/dist` |
-| `modules/apply-el9-module-patches.sh` | `src/puppet/modules/{clamav,dhcp,freeradius,simp_apache}/dist` |
+| `modules/apply-el9-module-patches.sh` | `src/puppet/modules/{clamav,dhcp,freeradius,simp_apache,iptables}/dist` |
 
 Then verify the RPM actually contains the change before building the ISO:
 
