@@ -103,9 +103,10 @@ Current build:
 
 | | |
 |---|---|
-| built | 2026-09-06 10:49 |
-| size | 3231883264 bytes |
-| sha256 | `4237daaa3b71efe80bc01d8230388c7c8533a93ff2812dd1bb6889c2b83d1167` |
+| built | 2026-09-06 12:21 |
+| size | 3231885312 bytes |
+| sha256 | `6a3bffd82b469f3d134d9a926fbee59967876cae44f8a4663e643b050985d0d5` |
+| signed by | `N3bula SIMP EL9 Release` -- 4096-bit RSA, no expiry, Key ID `2c6548ddc9f64972` |
 | `checkisomd5` | "It is OK to use this media." |
 | boot | `default simp` |
 
@@ -113,18 +114,17 @@ Verified on a node installed from this media, with **nothing hand-patched**:
 
 | check | result |
 |---|---|
+| signing key | `N3bula SIMP EL9 Release` imported; **no** `SIMP Development` key |
+| package signature | `RSA/SHA256 ... Key ID 2c6548ddc9f64972`; `rpm -K` -> `digests signatures OK` |
+| LUKS keyslot PBKDF | `pbkdf2` |
+| `fips-mode-setup --check` | "FIPS mode is enabled." -- no inconsistent state |
 | `simp config` + `simp bootstrap` | **0 errors** |
 | two consecutive `puppet agent -t` | **0 errors, 0 changes** |
-| LUKS keyslot PBKDF | `pbkdf2` (was `argon2id`) |
-| `fips-mode-setup --check` | "FIPS mode is enabled." -- no inconsistent state |
-| openvox | `openvox-server` 8.15.2 + `openvox-agent` 8.29.0, puppetserver active on 8140, CA signing |
-| offline | `openvox8-release` not installed; **0** repos pointing at the internet |
 | firewall | `iptables` enabled+active, 21 rules, SSH accept; `service iptables status` exits 0 |
-| NIC question | `(noninteractive) cli::network::set_up_nic = false` -- never asked |
-| packages | `chkconfig`, `initscripts` installed |
-| partitioning | 60G /, 35G /var, 20G /var/log, 4.9G audit, 15G /home |
+| puppetserver | enabled + active; `openvox-server` + `openvox-agent` |
+| offline | `openvox8-release` absent; **0** repos pointing at the internet |
 
-Blockers 1, 1b, 4, 4b, 11, 12, 12b, 13 and 14 are all closed and proven from the
+Blockers 1, 1b, 4, 4b, 11, 12, 12b, 13 and 14 are closed and proven from the
 media rather than by patching a running node.
 
 ---
