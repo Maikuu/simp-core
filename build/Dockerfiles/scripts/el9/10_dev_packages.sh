@@ -12,9 +12,12 @@ dnf config-manager --set-enabled crb
 dnf install -y rpm-build rpmdevtools rpm-devel rpm-sign yum-utils
 dnf install -y ruby-devel
 dnf install -y util-linux openssl augeas-libs createrepo_c git gnupg2 libicu-devel libxml2 libxml2-devel libxslt libxslt-devel which
-# genisoimage and isomd5sum are in EPEL 9; xorriso is the modern alternative
-dnf install -y genisoimage isomd5sum ||:
-dnf install -y xorriso ||:
+# ISO tooling. genisoimage is in EPEL and is REQUIRED: it ships /usr/bin/isoinfo,
+# which simp-rake-helpers checks for in build:auto. xorriso provides mkisofs but
+# NOT isoinfo, so it is not a substitute.
+dnf install -y genisoimage isomd5sum xorriso
+# mock: isolated RPM builds (build/README.md documents a per-distro mock.cfg)
+dnf install -y mock
 dnf install -y python3 fontconfig dejavu-sans-fonts dejavu-sans-mono-fonts dejavu-serif-fonts libjpeg-devel zlib-devel openssl-devel
 dnf install -y libyaml libyaml-devel autoconf gcc gcc-c++ glibc-devel readline-devel libffi-devel automake libtool bison sqlite-devel pinentry
 
