@@ -82,6 +82,86 @@ done
 echo
 echo "  total replacements this run: $total"
 
+# ---------------------------------------------------------------------------
+# The SysV status check cannot see an nf_tables-backed firewall.
+#
+# iptables::service hardcodes provider => 'redhat' and ships its own SysV
+# scripts, so Puppet asks /etc/init.d/iptables whether the service is running.
+# That script snapshots the active tables once, at load:
+#
+#     NF_TABLES=$(cat /proc/net/ip_tables_names 2>/dev/null)
+#
+# EL9's iptables is v1.8.10 (nf_tables). The legacy xtables list exists but is
+# always EMPTY, even with rules loaded, so status() falls through to
+#
+#     iptables: Firewall is not configured.     (exit 3)
+#
+# Puppet therefore believes the service is stopped on every run and "starts" it
+# again -- a corrective change on every single agent run, forever:
+#
+#     Notice: /Stage[main]/Iptables::Service/Service[iptables]/ensure:
+#       ensure changed 'stopped' to 'running' (corrective)
+#
+# Verified on an EL9 node: /proc/net/ip_tables_names is empty while
+# `iptables-save` reports "mangle raw filter nat" and 18 non-policy rules are
+# live.
+#
+# The fallback is deliberately guarded on the lockfile. `iptables-save` prints
+# the built-in tables even when the firewall is stopped, so using it
+# unconditionally would make a stopped firewall look running and break
+# `ensure => stopped`. The lockfile is what start()/stop() actually maintain, so
+# gating on it keeps both states honest:
+#
+#   legacy kernel      proc file non-empty  -> unchanged
+#   nft + started      lockfile present     -> tables found, status 0
+#   nft + stopped      lockfile absent      -> stays empty, "not running"
+# ---------------------------------------------------------------------------
+IPT_OLD='NF_TABLES=$(cat "$PROC_IPTABLES_NAMES" 2>/dev/null)'
+read -r -d '' IPT_NEW <<'IPTEOF' || true
+NF_TABLES=$(cat "$PROC_IPTABLES_NAMES" 2>/dev/null)
+
+# EL9: with the nf_tables backend (iptables-nft) the legacy xtables list at
+# $PROC_IPTABLES_NAMES stays empty even when rules are loaded, so every caller
+# below decides the firewall is unconfigured -- which makes status() return 3
+# and Puppet re-"start" the service on every run. Ask iptables itself instead.
+#
+# Guarded on the lockfile on purpose: ${IPTABLES}-save prints the built-in
+# tables even when the firewall is stopped, so an unguarded fallback would
+# report a stopped firewall as running. The lockfile is what start()/stop()
+# maintain, so it is the honest discriminator.
+if [ -z "$NF_TABLES" ] && [ -f "$VAR_SUBSYS_IPTABLES" ]; then
+    NF_TABLES=$(/sbin/${IPTABLES}-save 2>/dev/null | sed -n 's/^\*//p')
+fi
+IPTEOF
+
+for f in iptables ip6tables; do
+  t="$MODS/iptables/files/$f"
+  if [ ! -f "$t" ]; then echo "  [iptables] SKIP: files/$f absent"; continue; fi
+  if grep -q 'nf_tables backend (iptables-nft)' "$t"; then
+    echo "  [iptables] already patched (files/$f)"
+    continue
+  fi
+  if ! grep -qF "$IPT_OLD" "$t"; then
+    echo "  [iptables] FAILED: anchor not found in files/$f"; exit 1
+  fi
+  python3 - "$t" "$IPT_OLD" "$IPT_NEW" <<'PY'
+import sys
+path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(path).read()
+assert s.count(old) == 1, f"{path}: anchor matched {s.count(old)}x"
+open(path, 'w').write(s.replace(old, new))
+PY
+  echo "  [iptables] patched files/$f (nft-aware status)"
+done
+
+echo "  --- bash -n on the patched init scripts ---"
+for f in iptables ip6tables; do
+  t="$MODS/iptables/files/$f"
+  [ -f "$t" ] || continue
+  printf '    %-42s ' "iptables/files/$f"
+  bash -n "$t" 2>/dev/null && echo OK || echo "** FAILED **"
+done
+
 echo
 echo "  --- verifying no \$facts['environment'] remains in any module ---"
 if grep -rn -F "$OLD" "$MODS"/*/manifests/ 2>/dev/null; then

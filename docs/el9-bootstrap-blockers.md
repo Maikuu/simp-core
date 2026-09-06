@@ -771,24 +771,68 @@ Verified on a live EL9 node: installing both, then `puppet agent -t`, leaves
 `iptables` `enabled`/`active` with 21 live rules, and SSH survives (the ruleset
 admits the local subnet on 22 before its trailing `DROP`).
 
-### 12b. Residual: `Service[iptables]` is not idempotent on EL9
+### 12b. `Service[iptables]` was not idempotent on EL9  (FIXED)
 
-Every subsequent run reports a corrective change:
+Every run reported a corrective change:
 
 ```
 Notice: /Stage[main]/Iptables::Service/Service[iptables]/ensure: ensure changed 'stopped' to 'running' (corrective)
 ```
 
-`systemctl is-active iptables` says `active`, but the provider asks the SysV
-script, whose status check reads the legacy xtables table list. EL9's iptables
-is `v1.8.10 (nf_tables)`, so `/proc/net/ip_tables_names` exists but is empty,
-the script's `NF_TABLES` test fails, and it returns 3 -- "Firewall is not
-configured."
+`systemctl is-active iptables` said `active`, but the `redhat` provider asks the
+SysV script, which snapshots the active tables once at load:
 
-Effect is benign: Puppet re-runs `iptables-restore` with the identical file,
-which is atomic. But it is a real idempotency defect, and worth fixing upstream
--- either by teaching the status check about the nft backend, or by using the
-`iptables.service` unit that `iptables-nft-services` already provides.
+```sh
+NF_TABLES=$(cat /proc/net/ip_tables_names 2>/dev/null)
+```
+
+EL9's iptables is `v1.8.10 (nf_tables)`. The legacy xtables list exists but is
+always **empty**, even with rules loaded, so `status()` fell through to
+"Firewall is not configured." and returned 3. Puppet concluded the service was
+stopped and started it again, forever. Measured on the node: the proc file empty
+while `iptables-save` reported `mangle raw filter nat` and 18 non-policy rules
+were live.
+
+**Fix** (`build/el9-patches/modules/apply-el9-module-patches.sh`, patch 5) --
+fall back to asking iptables itself, in both `files/iptables` and
+`files/ip6tables`:
+
+```sh
+if [ -z "$NF_TABLES" ] && [ -f "$VAR_SUBSYS_IPTABLES" ]; then
+    NF_TABLES=$(/sbin/${IPTABLES}-save 2>/dev/null | sed -n 's/^\*//p')
+fi
+```
+
+The lockfile guard is **not** incidental. `${IPTABLES}-save` prints the built-in
+tables even when the firewall is stopped, so an unguarded fallback would report
+a stopped firewall as running and break `ensure => stopped`. The lockfile is
+what `start()`/`stop()` actually maintain, so it is the honest discriminator:
+
+| | legacy kernel | nft + started | nft + stopped |
+| --- | --- | --- | --- |
+| proc file | non-empty | empty | empty |
+| lockfile | -- | present | absent |
+| result | unchanged | tables found, status 0 | stays empty, "not running" |
+
+Both states were checked directly on the node before the change was shipped.
+
+**Verified:** `service iptables status` now exits **0** and lists the tables;
+the run that deploys the new script shows only the expected
+`File[/etc/init.d/iptables]/content` change, and the next run is **0 errors, 0
+changes**. Firewall unaffected -- still enabled, active, 21 rules, SSH accept
+present, chain still ending in `DROP`.
+
+Scope note: `files/ip6tables` carries the identical fix, but it is not exercised
+on a node with `ipv6_enabled: false` -- `iptables::service` only manages the
+ip6 script and service inside `if $ipv6 and $facts['ipv6_enabled']`. On such a
+node `/etc/init.d/ip6tables` may exist unpatched and unmanaged (owned by no
+package); the ip6 service runs from the `iptables-nft-services` systemd unit and
+Puppet does not touch it, so it reports no corrective.
+
+Still worth raising upstream: the status check should understand the nft
+backend, or `iptables::service` should use the `iptables.service` unit that
+`iptables-nft-services` already provides instead of hardcoding
+`provider => 'redhat'`.
 
 ---
 
