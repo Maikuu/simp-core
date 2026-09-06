@@ -51,6 +51,14 @@ is the AlmaLinux 9.8 VM at `10.20.31.130` (`/build`, a dedicated 500 GB XFS disk
     # pkg:modules, which is what packages them into RPMs.
     bash build/el9-patches/modules/apply-el9-module-patches.sh
 
+    # REQUIRED: EL9 hiera + rsync tree for the environment skeleton -- iptables
+    # backend, haveged/tcpwrappers off, SSH opened, RedHat/9 rsync shares, and
+    # pupmod::openvox_rpm_path so the master never fetches the vendor release
+    # RPM (blockers 8, 9, 10, 14). These write into src/assets/environment and
+    # src/assets/rsync_data, so they MUST run before pkg:aux.
+    bash build/el9-patches/environment-skeleton/apply-el9-hiera.sh
+    bash build/el9-patches/rsync-skeleton/apply-el9-rsync.sh
+
     bundle exec rake 'pkg:key_prep[dev]'    # dev signing key; expires in 14 days
     bundle exec rake pkg:modules
     bundle exec rake pkg:aux
@@ -86,16 +94,14 @@ the current ISO was produced:
     isoinfo -R -f -i <iso> | grep -E 'isolinux.bin|efiboot.img|BOOTX64.EFI'
     mount -o loop,ro <iso> /mnt && grep '^default' /mnt/isolinux/isolinux.cfg
 
-Current build -- carries the four simp-cli fixes, the chkconfig/initscripts
-kickstart fix (blocker 12) and the `$environment` module fix (blocker 13):
+Current build:
 
 | | |
 |---|---|
-| built | 2026-09-06 01:02 |
-| size | 3231877120 bytes |
-| sha256 | `6ba1c3927d6715ce461caaf89518a0f14db81d1b7ba4ae0c43ab55b0a30f45ee` |
+| built | 2026-09-06 09:09 |
+| size | 3231879168 bytes |
+| sha256 | `fa19078252026369309cd4d7e3347dd3f00196b4cfce738eb5258bb6a16d28ee` |
 | `checkisomd5` | "It is OK to use this media." |
-| repos | BaseOS 636, AppStream 259, SimpRepos/SIMP 127, SimpRepos/puppet 4 |
 | boot | `default simp` |
 
 Verified by mounting the ISO and checking the shipped artifacts directly (not
@@ -108,9 +114,13 @@ The previous ISO has been installed end to end: `simp config` and
 `simp bootstrap` both completed without hand-patching, which is what surfaced
 blockers 12 and 13. Those two fixes are in this ISO but have only been proven
 by patching the running node, not yet by a fresh install from this media.
-The likeliest next failures are in `auto.cfg`'s `%post`: FIPS enablement (EL9 uses
-`crypto-policies-scripts`/`fips-mode-setup`, and `fipscheck` no longer exists) and
-`simp_filesystem.repo` generation.
+
+A node installed from the previous ISO proved blockers 11, 12 and 13 fixed at
+the media level with no hand-patching: `chkconfig`/`initscripts` installed,
+`iptables` active out of the box with 21 rules, `cli::network::set_up_nic =
+false` recorded `(noninteractive)` -- the NIC question was never asked -- and
+`Rsync[site] ... executed successfully`. That install surfaced blocker 14, whose
+fix is in this build but so far proven only on the running node.
 
 
 ---
@@ -140,6 +150,15 @@ guard can never fire — `SIMP_BUILD_PKG_require_rebuild=yes` is a no-op.
 ```bash
 rm -rf src/assets/<component>/dist build/SIMP/RPMS build/SIMP/SRPMS
 ```
+
+Which `dist/` goes with which patch script:
+
+| patched by | remove |
+|---|---|
+| `simp-cli/apply-el9-simp-cli.sh` | `src/assets/rubygem_simp_cli/dist` |
+| `environment-skeleton/apply-el9-hiera.sh` | `src/assets/environment/dist` |
+| `rsync-skeleton/apply-el9-rsync.sh` | `src/assets/rsync_data/dist` |
+| `modules/apply-el9-module-patches.sh` | `src/puppet/modules/{clamav,dhcp,freeradius,simp_apache}/dist` |
 
 Then verify the RPM actually contains the change before building the ISO:
 
