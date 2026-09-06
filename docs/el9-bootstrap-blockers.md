@@ -736,6 +736,113 @@ recommended values that later patches changed.
 
 ---
 
+## 12. The firewall silently never loads: `chkconfig` is not installed  (BLOCKER)
+
+After a clean bootstrap the box runs **wide open** -- `-P INPUT ACCEPT`, zero
+rules -- while `/etc/sysconfig/iptables` contains a complete and correct
+ruleset. Two errors in the bootstrap log:
+
+```
+Error: /Stage[main]/Iptables::Service/File[/etc/init.d/iptables-retry]/ensure:
+  change from 'absent' to 'file' failed: ... A directory component in
+  /etc/init.d/iptables-retry...lock does not exist or is a dangling symbolic link
+Error: /Stage[main]/Iptables::Service/Service[iptables]: Provider redhat is not functional on this host
+```
+
+`iptables::service` hardcodes `provider => 'redhat'` and ships its **own** SysV
+scripts (`/etc/init.d/iptables`, `/etc/init.d/iptables-retry`) rather than using
+the systemd unit, to get its retry-on-boot-failure behaviour. That needs:
+
+| need | provided by | status on a stock EL9 SIMP install |
+| --- | --- | --- |
+| `/usr/sbin/chkconfig` (Puppet's `redhat` provider) | `chkconfig` | **missing** |
+| `/etc/init.d` | `chkconfig` | **missing** |
+| `/etc/init.d/functions` (sourced by the scripts) | `initscripts` | **missing** |
+| `/usr/sbin/service` | `initscripts-service` | present |
+
+Both packages were already in `9-simp_pkglist.txt`, so they were on the ISO and
+installable -- they were simply never in the kickstart's `%packages`. **Being in
+the keep-list is not the same as being installed**: the keep-list only controls
+what survives pruning into the repo.
+
+**Fix:** `chkconfig` and `initscripts` added to `%packages` in `simp_ks_base`.
+
+Verified on a live EL9 node: installing both, then `puppet agent -t`, leaves
+`iptables` `enabled`/`active` with 21 live rules, and SSH survives (the ruleset
+admits the local subnet on 22 before its trailing `DROP`).
+
+### 12b. Residual: `Service[iptables]` is not idempotent on EL9
+
+Every subsequent run reports a corrective change:
+
+```
+Notice: /Stage[main]/Iptables::Service/Service[iptables]/ensure: ensure changed 'stopped' to 'running' (corrective)
+```
+
+`systemctl is-active iptables` says `active`, but the provider asks the SysV
+script, whose status check reads the legacy xtables table list. EL9's iptables
+is `v1.8.10 (nf_tables)`, so `/proc/net/ip_tables_names` exists but is empty,
+the script's `NF_TABLES` test fails, and it returns 3 -- "Firewall is not
+configured."
+
+Effect is benign: Puppet re-runs `iptables-restore` with the identical file,
+which is atomic. But it is a real idempotency defect, and worth fixing upstream
+-- either by teaching the status check about the nft backend, or by using the
+`iptables.service` unit that `iptables-nft-services` already provides.
+
+---
+
+## 13. `$facts['environment']` is always empty on Puppet 8  (BLOCKER)
+
+```
+Notice: Rsync[site](provider=rsync): @ERROR: Unknown module 'apache__RedHat'
+Error: /Stage[main]/Simp_apache/Rsync[site]/action: change from 'pull' to 'pull' failed: Rsync exited with code 5
+```
+
+The share name is built as `apache_${facts['environment']}_${facts['os']['name']}`
+and the middle term vanished. The server side is correct -- `rsyncd.conf` serves
+`[apache_production_RedHat]` with `auth users = apache_rsync_production_redhat`.
+
+`environment` has never been a real Facter fact. Older Puppet populated the fact
+hash from node parameters, which carried it; Puppet 8 builds `$facts` from
+Facter plus custom facts only, so the interpolation silently yields `''`.
+Confirmed on an EL9 node, with `include_legacy_facts = true` set and legacy
+facts such as `osfamily` resolving correctly -- so this is **not** the same
+problem as section 7:
+
+```
+BUILTIN=[production]   FACTHASH=[]
+```
+
+Note this also shifts the `simplib::passgen()` key, so the client derives the
+wrong rsync password as well as the wrong user -- the share name is just the
+first thing to fail.
+
+**Affected** (`build/el9-patches/modules/apply-el9-module-patches.sh`):
+
+| module | occurrences |
+| --- | --- |
+| `clamav` | 1 |
+| `dhcp` | 3 |
+| `freeradius` | 2 |
+| `simp_apache` | 3 |
+
+`named` is **not** affected: it uses `$server_facts['environment']`, which is
+populated when a master compiles the catalog. Beware that
+`server_facts['environment']` contains `facts['environment']` as a substring, so
+a naive grep reports `named` as affected when it is not.
+
+**Fix:** the built-in `$environment`, which is correct at compile time both for
+master-compiled catalogs and for `puppet apply` (where `$server_facts` is
+empty).
+
+Verified end-to-end on a live node: after patching, `Rsync[site] ... executed
+successfully` and two consecutive agent runs report **0 errors**.
+
+This is an upstream SIMP bug, not an EL9 one -- it affects any Puppet 8 master.
+
+---
+
 ## `simp config` notes
 
 `simp config` runs fully non-interactively with `-f -D`, but two things are not

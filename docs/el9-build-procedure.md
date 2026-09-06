@@ -41,10 +41,15 @@ is the AlmaLinux 9.8 VM at `10.20.31.130` (`/build`, a dedicated 500 GB XFS disk
     export SIMP_RPM_dist=.el9 SIMP_BUILD_distro=RedHat,9,x86_64 LANG=en_US.UTF-8
     bundle exec rake 'deps:checkout[el9]'
 
-    # REQUIRED: three simp-cli defects that only bite on EL9 (blockers 1, 1b, 11).
+    # REQUIRED: four simp-cli defects that only bite on EL9 (blockers 1, 1b, 11).
     # MUST run after deps:checkout -- it wipes src/assets -- and before pkg:aux,
     # which is what packages the gem into rubygem-simp-cli.
     bash build/el9-patches/simp-cli/apply-el9-simp-cli.sh
+
+    # REQUIRED: $facts['environment'] is empty on Puppet 8 (blocker 13).
+    # MUST run after deps:checkout -- it wipes src/puppet/modules -- and before
+    # pkg:modules, which is what packages them into RPMs.
+    bash build/el9-patches/modules/apply-el9-module-patches.sh
 
     bundle exec rake 'pkg:key_prep[dev]'    # dev signing key; expires in 14 days
     bundle exec rake pkg:modules

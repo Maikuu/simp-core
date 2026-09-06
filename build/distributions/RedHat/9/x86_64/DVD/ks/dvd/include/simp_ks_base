@@ -5,6 +5,16 @@ selinux --enforcing
 acl
 aide
 bzip2
+# chkconfig + initscripts: SIMP's iptables::service hardcodes provider => 'redhat'
+# and ships its own SysV scripts (/etc/init.d/iptables, iptables-retry) to get
+# retry-on-boot-failure. Puppet's redhat provider needs chkconfig, chkconfig owns
+# /etc/init.d, and the init scripts source /etc/init.d/functions from initscripts.
+# Without these the firewall silently never loads: rules are written to
+# /etc/sysconfig/iptables but Service[iptables] fails "Provider redhat is not
+# functional" and the box runs wide open. Both were already in the keep-list --
+# being on the ISO is not the same as being installed.
+chkconfig
+initscripts
 chrony
 crontabs
 dhcp-client
