@@ -94,19 +94,26 @@ EOF
 # small the initial size of the partion can to be to prevent the error.
 
   if [ $encrypt -eq 0 ]; then
-    # --pbkdf=pbkdf2 is REQUIRED on EL9.
+    # --pbkdf=pbkdf2 is passed here, but DO NOT RELY ON IT. Anaconda accepts the
+    # option and records it verbatim in the installed anaconda-ks.cfg, and
+    # blivet builds a LUKS2PBKDFArgs object from it -- and the keyslot still
+    # comes out argon2id. Measured on an install from this media:
     #
-    # EL9's cryptsetup defaults LUKS2 keyslots to Argon2id, which is not a
-    # FIPS-approved KDF. `fips-mode-setup --enable` (run later in %post)
-    # detects this and refuses:
+    #   anaconda-ks.cfg: part pv.141 ... --encrypted --luks-version=luks2 --pbkdf=pbkdf2
+    #   luksDump Keyslots: 0: luks2 ... PBKDF: argon2id
+    #
+    # EL9's cryptsetup defaults LUKS2 keyslots to Argon2id, which is not
+    # FIPS-approved, so `fips-mode-setup --enable` later in %post refuses:
     #
     #   The following encrypted devices use Argon2 PBKDF: /dev/sdaN(luks-...)
     #   Aborting fips-mode-setup because of that.
     #
-    # The result is a half-enabled system: the kernel gets fips=1 from the
-    # boot loader, but /etc/system-fips is never written and the crypto
-    # policy stays DEFAULT. Forcing pbkdf2 at format time keeps the keyslot
-    # FIPS-compatible so fips-mode-setup completes.
+    # THE ACTUAL FIX lives in ks/dvd/auto.cfg, which passes `--pbkdf pbkdf2` to
+    # the luksChangeKey it already runs in %post --nochroot, and then asserts
+    # the keyslot really is pbkdf2 before continuing. See the comment there.
+    #
+    # The option is kept here because it is correct to ask for, costs nothing,
+    # and will start working if the anaconda/blivet bug is ever fixed.
     echo "part pv.01 --size=20480 --grow --ondisk ${DISK} --encrypted --pbkdf=pbkdf2 --passphrase=${passphrase}" >> /tmp/part-include
   else
     echo "part pv.01 --size=1 --grow --ondisk ${DISK}" >> /tmp/part-include
