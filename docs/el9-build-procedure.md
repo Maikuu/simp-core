@@ -243,3 +243,54 @@ The note that `build:auto` raises `no implicit conversion of nil into String`
 after `iso:build` succeeds is **fixed** by gem patch 6 (per-variant repodata).
 `build:auto` completes with RC=0 and there is no longer any need to run
 `iso:build` by hand.
+
+---
+
+## EL9 module forks
+
+Some SIMP modules carry EL9 fixes upstream has not taken. Those are **forks**,
+not patch scripts, so the changes are real commits with history that can be
+reviewed and submitted upstream as PRs.
+
+### Layout on the build host
+
+    /build/el9-forks/<module>          worktree -- edit here, push to GitLab from here
+    /build/el9-forks/git/<module>      bare mirror -- what deps:checkout reads
+
+Serve from the **bare** mirror. Cloning `--branch <annotated-tag>` from a
+non-bare repo leaves `git describe` empty, so the tag does not resolve; from a
+bare mirror it resolves correctly. Re-mirror after committing:
+
+    git clone --bare /build/el9-forks/<module> /build/el9-forks/git/<module>
+
+The bare copies deliberately have **no `.git` suffix**, so
+`"#{el9_fork_base}/pupmod-simp-named"` resolves identically for the local
+`file://` path now and a GitLab URL later.
+
+### Switching to GitLab
+
+`Puppetfile.el9` reads one variable:
+
+    el9_fork_base = ENV['SIMP_EL9_FORK_BASE'] || 'file:///build/el9-forks/git'
+
+Point it at the RHEL 9 project and nothing else changes:
+
+    export SIMP_EL9_FORK_BASE='https://gitlab.example.com/<group>/rhel9'
+
+### Convention
+
+* Branch `el9` from the exact upstream tag the pin set uses, so the diff stays
+  minimal and reviewable.
+* One commit per defect, with the reproduction in the message.
+* Tag `<upstream-version>-el9` and pin that in `Puppetfile.el9`.
+* Remove the corresponding block from `build/el9-patches/` once forked.
+
+### Forked so far
+
+| module | fork tag | fixes |
+|---|---|---|
+| `pupmod-simp-named` | `7.0.2-el9` | `/var/named` mode 0750 -> 1770 (BIND cannot start otherwise); rsync username from `$environment` rather than `$server_facts` |
+
+Still patch-script based, candidates for forking: `iptables` (nft-aware SysV
+status), `clamav` / `dhcp` / `freeradius` / `simp_apache` (`$facts['environment']`),
+and `rubygem_simp_cli` (four defects, lives in `src/assets`).

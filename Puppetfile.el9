@@ -18,6 +18,21 @@
 #   Known stale bounds are catalogued in docs/el9-stale-version-bounds.md
 #   and are handled at RPM-build time via build/rpm/dependencies.yaml.
 #
+
+# EL9 FORKS
+#   Some components carry EL9 fixes that upstream has not taken. Those are
+#   maintained as forks of the exact upstream tag, with each fix as its own
+#   commit, tagged <upstream-version>-el9. The diff against upstream is
+#   deliberately minimal so the changes stay reviewable and submittable as PRs.
+#
+#   SIMP_EL9_FORK_BASE selects where they are fetched from. It defaults to the
+#   local path used by the disconnected build host; point it at the GitLab RHEL9
+#   project once that exists and nothing else here has to change:
+#
+#     export SIMP_EL9_FORK_BASE='https://gitlab.n3bulasystems.com/<group>/rhel9'
+#
+el9_fork_base = ENV['SIMP_EL9_FORK_BASE'] || 'file:///build/el9-forks/git'
+
 # TWO COMPONENTS ARE PINNED BY COMMIT, NOT TAG
 #   simp-adapter and rubygem-simp-cli carry their OpenVox/EL9 support only
 #   on master; their newest tags (2.1.1 and 7.0.0/2021) predate OpenVox
@@ -310,9 +325,16 @@ mod 'simp-mozilla',
   :git => 'https://github.com/simp/pupmod-simp-mozilla',
   :tag => '6.0.1'
 
+# EL9 FORK -- upstream 7.0.2 plus two fixes:
+#   * /var/named forced to 0750, which BIND rejects: it is started -u named and
+#     checks its `directory` is writable, so it exits during config parsing.
+#     The bind RPM ships 1770 (drwxrwx--T) deliberately. Both install.pp and
+#     chroot.pp were affected.
+#   * the rsync username was built from $server_facts['environment'], which is
+#     empty under `puppet apply` and collapses the name to a double underscore.
 mod 'simp-named',
-  :git => 'https://github.com/simp/pupmod-simp-named',
-  :tag => '7.0.2'
+  :git => "#{el9_fork_base}/pupmod-simp-named",
+  :tag => '7.0.2-el9'
 
 mod 'simp-nfs',
   :git => 'https://github.com/simp/pupmod-simp-nfs',
