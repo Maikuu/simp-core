@@ -822,3 +822,44 @@ nvme-cli
 # library; without subscription-manager installed nothing uses it, and dnf stops
 # printing "Updating Subscription Management repositories / Unable to read
 # consumer identity" on every transaction.
+
+# --- Network infrastructure services: bind / dhcpd / tftp -------------------
+#
+# The seed puppetserver has to be able to stand up DNS, DHCP and TFTP from base
+# code alone, so it can kickstart the next machine (the repo server), which is
+# then hydrated with a full RHEL 9 repo and used to kickstart everything else.
+# On a disconnected lab there is no other source for these packages.
+#
+# None of them were surviving into the pruned repo, so the classes that need
+# them failed on a real run:
+#
+#   Error: Could not update: Execution of '/usr/bin/dnf -y install bind'
+#     returned 1: No match for argument: bind
+#   Error: /Stage[main]/Named::Install/Package[bind]/ensure: change from
+#     'purged' to 'latest' failed
+#
+# Note this is NOT only a DNS-server concern. simp/data/os/Linux.yaml puts
+# 'resolv' in the 'simp' scenario, so resolv is applied to EVERY node, and
+# resolv/init.pp includes named::caching on any node whose
+# simp_options::dns::servers starts with 127.0.0.1. So bind can be needed
+# fleet-wide, not just on the machine that serves zones.
+#
+# All five are on the RHEL 9.8 media, ~1.9 MB total, and every direct
+# dependency is already in this list (bind-libs and bind-utils were already
+# here -- only the server package was missing).
+#
+#   bind         AppStream  513K  named::install -> package { 'bind': }
+#   bind-chroot  AppStream   29K  optional; current runs use named::non_chroot,
+#                                 kept so named::chroot remains available
+#   dhcp-server  BaseOS     1.3M  dhcp::dhcpd
+#   tftp-server  AppStream   40K  tftpboot
+#   tftp         AppStream   32K  client, for verifying PXE from the server
+#
+# syslinux and mtools are deliberately NOT added: syslinux-tftpboot is already
+# present and is what the tftpboot module uses for pxelinux.0 and the *.c32
+# files ("use the OS provided syslinux and initial boot files").
+bind
+bind-chroot
+dhcp-server
+tftp-server
+tftp
