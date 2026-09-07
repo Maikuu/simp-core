@@ -103,12 +103,11 @@ Current build:
 
 | | |
 |---|---|
-| built | 2026-09-06 12:21 |
-| size | 3231885312 bytes |
-| sha256 | `6a3bffd82b469f3d134d9a926fbee59967876cae44f8a4663e643b050985d0d5` |
-| signed by | `N3bula SIMP EL9 Release` -- 4096-bit RSA, no expiry, Key ID `2c6548ddc9f64972` |
+| built | 2026-09-06 14:56 |
+| sha256 | `b267749cdd488ba4f6e6d3b37e8fe775f4ec38dc307cb79523987919da1d5970` |
+| signed by | `N3bula SIMP EL9 Release`, Key ID `2c6548ddc9f64972` |
 | `checkisomd5` | "It is OK to use this media." |
-| boot | `default simp` |
+| adds | `bind`, `bind-chroot`, `dhcp-server`, `tftp-server`, `tftp` |
 
 Verified on a node installed from this media, with **nothing hand-patched**:
 
