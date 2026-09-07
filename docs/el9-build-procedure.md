@@ -289,7 +289,12 @@ Point it at the RHEL 9 project and nothing else changes:
 
 | module | fork tag | ships as | fixes |
 |---|---|---|---|
-| `pupmod-simp-named` | `7.0.3-el9` | `pupmod-simp-named-7.0.3-1.el9` | `/var/named` mode 0750 -> 1770 (BIND cannot start otherwise); rsync username from `$environment` rather than `$server_facts`; version bumped so the RPM is distinguishable from upstream 7.0.2 |
+| `pupmod-simp-named` | `7.0.3-el9` | `pupmod-simp-named-7.0.3-1.el9` | `/var/named` mode 0750 -> 1770 (BIND cannot start otherwise); rsync username from `$environment` rather than `$server_facts` |
+| `pupmod-simp-iptables` | `8.0.5-el9` | `pupmod-simp-iptables-8.0.5-1.el9` | SysV `status()` reads the legacy xtables list, which is always empty under EL9's nf_tables backend, so Puppet re-starts the service every run |
+
+Both carry a `metadata.json` version bump, because the RPM version and the tag
+`simp-cli` writes into a generated `Puppetfile.simp` are derived from it. Without
+the bump the fork ships the same NEVRA as upstream with different content.
 
 ### Two traps when changing a fork's pin
 

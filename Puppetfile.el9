@@ -293,9 +293,14 @@ mod 'simp-ima',
 # NOTE: iptables 9.x violates simp.optional_dependencies bounds asserted at
 # compile time by krb5, nfs, postfix, rsyslog, simp_snmpd, ssh and vsftpd
 # (>= 6.5.3 < 9.0.0).
+# EL9 FORK -- upstream 8.0.4 plus the nft-aware SysV status check.
+#   iptables::service hardcodes provider => 'redhat' and ships its own SysV
+#   scripts, whose status() reads the legacy xtables table list. EL9's iptables
+#   is nf_tables, so that list is always empty and Puppet re-"starts" the
+#   service on every run. Version bumped to 8.0.5 so the RPM is distinguishable.
 mod 'simp-iptables',
-  :git => 'https://github.com/simp/pupmod-simp-iptables',
-  :tag => '8.0.4'
+  :git => "#{el9_fork_base}/pupmod-simp-iptables",
+  :tag => '8.0.5-el9'
 
 mod 'simp-issue',
   :git => 'https://github.com/simp/pupmod-simp-issue',
