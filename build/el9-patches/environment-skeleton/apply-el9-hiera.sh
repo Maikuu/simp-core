@@ -141,8 +141,14 @@ iptables::install::ipv6_package: iptables-nft-services
 # i.e. whatever was answered during `simp config`, giving:
 #
 #   -m state --state NEW -m tcp -p tcp -s <trusted_nets> --dports 22 -j ACCEPT
+# Port keys are quoted deliberately. Puppet's `merge: hash` requires
+# Hash[String, Data]; an unquoted YAML key parses as Integer and the merge
+# fails with "The first element of the merge has wrong type". Quoting lets
+# lower layers (e.g. hostgroups/puppet.yaml adding LDAP 389/636) merge into
+# this hash instead of being silently shadowed. iptables::ports runs
+# Integer.new() on the key, so strings are accepted.
 iptables::ports:
-  22:
+  '22':
     proto: tcp
 
 # --- Never fetch the OpenVox release RPM from the internet ------------------
@@ -182,6 +188,35 @@ iptables::ports:
 # packages" step in docs/el9-build-procedure.md), or override it per-site once
 # the reposerver exists.
 pupmod::openvox_rpm_path: /var/www/yum/SIMP/RedHat/9/x86_64/puppet/openvox-server-8.15.2-1.el9.noarch.rpm
+
+# --- named needs to write its own directory on EL9 ---------------------------
+#
+# BIND 9.16 verifies that `directory` is writable while parsing the config, and
+# it does so by actually attempting a write. /var/named is labelled
+# named_zone_t, and SELinux denies named_t writing there unless
+# named_write_master_zones is on:
+#
+#   avc: denied { write } for comm="isc-net-0000" name="named"
+#     scontext=system_u:system_r:named_t:s0
+#     tcontext=system_u:object_r:named_zone_t:s0 tclass=dir
+#
+# pupmod-simp-named defaults sebool_named_write_master_zones to false and sets
+# the boolean off persistently, so without this key named cannot start at all on
+# an enforcing EL9 system -- the seed server could not serve DNS.
+#
+# The parameter is documented for "dynamic DNS or zone transfers", neither of
+# which SIMP's rsync-delivered static zones need. It is required here only to
+# satisfy BIND's startup writability probe. Pointing `directory` at a
+# named_cache_t path would avoid it, but every relative zone path would have to
+# move with it; managed-keys-directory alone is NOT sufficient -- verified, the
+# denial persists because the probe is independent of managed keys.
+named::sebool_named_write_master_zones: true
+
+# Pin UTC explicitly rather than relying on the timezone module's default.
+# A PXE-kickstarted client used to come up in EDT because pupclient set no
+# timezone and anaconda defaults to America/New_York; the kickstart now sets
+# it at install and this keeps Puppet enforcing it on every run.
+timezone::timezone: 'Etc/UTC'
 YAML
 
 # The per-node layer outranks per-OS, and `simp config` copies these templates

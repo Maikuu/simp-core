@@ -111,3 +111,92 @@ echo "   RedHat/9 files: $(find "$root/RedHat/9" -type f | wc -l | tr -d ' ')"
 echo
 echo "== leftover EL7/EL8 references"
 if grep -rn 'RedHat/[78]' "$root" 2>/dev/null | head -5; then :; else echo "   none"; fi
+
+# --- BIND 9.16: query-source may not pin the DNS listener port ---------------
+#
+# The stock bind_dns named.conf carries, inherited from the EL7/EL8 trees this
+# EL9 tree was copied from:
+#
+#   query-source    port 53;
+#   query-source-v6 port 53;
+#
+# EL8 shipped BIND 9.11, which allowed it. EL9 ships 9.16, which rejects it
+# outright -- named will not even parse the file:
+#
+#   /etc/named.conf:10: 'query-source' cannot specify the DNS listener port (53)
+#
+# Removing it is also correct on its own terms: a fixed source port defeats
+# source-port randomisation, the post-Kaminsky cache-poisoning mitigation.
+# Nothing is lost by dropping it, and EL10 will ship a newer BIND still.
+#
+# Verified: with these two lines commented the stock file passes
+# `named-checkconf` clean on BIND 9.16.23, and they are the ONLY EL9 problem in
+# it -- keep-response-order, controls/rndc, forwarders, allow-transfer and the
+# stock zones all parse fine.
+nc="$root/RedHat/9/bind_dns/default/named/etc/named.conf"
+if [ -f "$nc" ]; then
+  if grep -qE '^[[:space:]]*query-source(-v6)?[[:space:]]+port 53;' "$nc"; then
+    # perl, not sed: BSD sed (macOS) supports neither \s nor \n-in-replacement,
+    # and this script has to run on the Mac checkout as well as the build box.
+    perl -i -pe '
+      s{^(\s*)(query-source(?:-v6)?\s+port 53;)}
+       {$1# EL9: BIND 9.16 rejects pinning the query source port (see apply-el9-rsync.sh)\n$1#$2}
+    ' "$nc"
+    echo "   bind_dns named.conf: query-source lines commented (BIND 9.16)"
+  else
+    echo "   bind_dns named.conf: query-source already handled"
+  fi
+else
+  echo "   bind_dns named.conf: NOT FOUND at $nc" >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# /var/named must ship 1770, not 0750.
+#
+# BIND runs -u named and aborts config parsing if its `directory` is not
+# writable, so /var/named has to be group-writable; the bind RPM ships 1770
+# (drwxrwx--T) deliberately -- sticky so group members cannot remove each
+# other's zone files.
+#
+# The mode is NOT set by the RPM's %defattr and NOT by the rsync provider's
+# --chmod (the provider runs with -p, preserve_perms defaults to true and no
+# --chmod is passed -- verified against the live rsync command line). It comes
+# from this .rsync.facl file, which simp-cli replays verbatim via
+# `setfacl --restore` in Simp::Cli::Environment::SecondaryDirEnv#apply_facls
+# when the environment is created.
+#
+# So the stanza itself has to carry the mode: group::rwx for group-write, and
+# a `# flags:` line for the sticky bit, which setfacl --restore does honour
+# (verified: --t restores 1770).
+#
+# Without this, every agent run reports File[/var/named] as a corrective
+# change -- rsync faithfully delivers the skeleton's 0750 and the named module
+# then puts it back to 1770, forever.
+python3 - "$facl" <<'PYEOF'
+import io, re, sys
+
+path   = sys.argv[1]
+target = 'RedHat/9/bind_dns/default/named/var/named'
+text   = io.open(path, encoding='utf-8').read()
+stanzas = text.split("\n\n")
+
+hits = 0
+for i, st in enumerate(stanzas):
+    m = re.search(r'^# file: (.+)$', st, re.M)
+    if not m or m.group(1).strip() != target:
+        continue
+    hits += 1
+    if re.search(r'^# flags:', st, re.M):
+        print("   .rsync.facl: /var/named already 1770")
+        break
+    st = re.sub(r'^(# group: .*)$', r'\1\n# flags: --t', st, count=1, flags=re.M)
+    st = re.sub(r'^group::r-x$', 'group::rwx', st, count=1, flags=re.M)
+    stanzas[i] = st
+    io.open(path, 'w', encoding='utf-8').write("\n\n".join(stanzas))
+    print("   .rsync.facl: /var/named set to 1770 (group::rwx + sticky)")
+    break
+
+if hits != 1:
+    sys.exit("   FATAL: expected exactly 1 '%s' stanza, found %d" % (target, hits))
+PYEOF

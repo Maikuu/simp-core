@@ -293,14 +293,21 @@ mod 'simp-ima',
 # NOTE: iptables 9.x violates simp.optional_dependencies bounds asserted at
 # compile time by krb5, nfs, postfix, rsyslog, simp_snmpd, ssh and vsftpd
 # (>= 6.5.3 < 9.0.0).
-# EL9 FORK -- upstream 8.0.4 plus the nft-aware SysV status check.
-#   iptables::service hardcodes provider => 'redhat' and ships its own SysV
-#   scripts, whose status() reads the legacy xtables table list. EL9's iptables
-#   is nf_tables, so that list is always empty and Puppet re-"starts" the
-#   service on every run. Version bumped to 8.0.5 so the RPM is distinguishable.
+# EL9 FORK -- upstream 8.0.4 plus two fixes:
+#   * the SysV status() check read the legacy xtables table list. iptables::service
+#     hardcodes provider => 'redhat' and ships its own SysV scripts, so on EL9 --
+#     where iptables is nf_tables -- that list is always empty and Puppet
+#     re-"starts" the service on every run. status() is now nft-aware.
+#   * iptables-retry/ip6tables-retry are inert on EL9. iptables-services ships a
+#     native iptables.service, and systemd's generator.late is the lowest-priority
+#     unit path, so that native unit shadows SIMP's SysV script -- which holds the
+#     only writer of the /tmp/iptables_retry sentinel the retry service keys off.
+#     They can never fire, yet they are the only SysV scripts with no native unit,
+#     making them the sole source of the systemd-sysv-generator warning on every
+#     daemon-reload. Removed, with a presence-guarded purge for existing nodes.
 mod 'simp-iptables',
   :git => "#{el9_fork_base}/pupmod-simp-iptables",
-  :tag => '8.0.5-el9'
+  :tag => '8.0.6-el9'
 
 mod 'simp-issue',
   :git => 'https://github.com/simp/pupmod-simp-issue',
@@ -330,16 +337,22 @@ mod 'simp-mozilla',
   :git => 'https://github.com/simp/pupmod-simp-mozilla',
   :tag => '6.0.1'
 
-# EL9 FORK -- upstream 7.0.2 plus two fixes:
+# EL9 FORK -- upstream 7.0.2 plus three fixes:
 #   * /var/named forced to 0750, which BIND rejects: it is started -u named and
 #     checks its `directory` is writable, so it exits during config parsing.
 #     The bind RPM ships 1770 (drwxrwx--T) deliberately. Both install.pp and
 #     chroot.pp were affected.
 #   * the rsync username was built from $server_facts['environment'], which is
 #     empty under `puppet apply` and collapses the name to a double underscore.
+#   * /var/named was reverted to 0750 by the rsync on every agent run, so the
+#     mode is now asserted after the sync rather than before it. NOTE: the mode
+#     itself is delivered by the skeleton's .rsync.facl (replayed by simp-cli
+#     with `setfacl --restore`), NOT by the rsync provider -- it runs with -p
+#     and passes no --chmod. The skeleton now declares 1770, so this assertion
+#     is a no-op on current media and a safety net on older environments.
 mod 'simp-named',
   :git => "#{el9_fork_base}/pupmod-simp-named",
-  :tag => '7.0.3-el9'
+  :tag => '7.0.5-el9'
 
 mod 'simp-nfs',
   :git => 'https://github.com/simp/pupmod-simp-nfs',
@@ -475,9 +488,16 @@ mod 'simp-swap',
   :git => 'https://github.com/simp/pupmod-simp-swap',
   :tag => '1.0.2'
 
+# EL9 FORK -- upstream 8.0.1 plus the restored tftp firewall rule.
+#   Through EL8 this module ran tftp under xinetd, and xinetd::service opened
+#   udp/69 itself using the module's own $trusted_nets. EL9 dropped xinetd, so
+#   upstream moved to systemd socket activation and the rule went with it --
+#   $trusted_nets survived but nothing consumed it, so tftp listened and no PXE
+#   client could reach it. Restored with the same order and semantics, gated on
+#   a $firewall parameter matching dhcp::dhcpd.
 mod 'simp-tftpboot',
-  :git => 'https://github.com/simp/pupmod-simp-tftpboot',
-  :tag => '8.0.1'
+  :git => "#{el9_fork_base}/pupmod-simp-tftpboot",
+  :tag => '8.0.3-el9'
 
 mod 'simp-tlog',
   :git => 'https://github.com/simp/pupmod-simp-tlog',
@@ -522,10 +542,18 @@ mod 'treydock-kdump',
   :git => 'https://github.com/simp/pupmod-treydock-kdump',
   :tag => 'v2.0.4'
 
-# NOTE: repo archived
+# EL9 FORK -- upstream simp-2.3.0 plus structured OS facts.
+#   params.pp switched on $facts['operatingsystem'] and compared
+#   $facts[operatingsystemmajrelease]. Puppet 8 defaults include_legacy_facts to
+#   false, so both are empty on any client that has not re-enabled them, the case
+#   falls through to its default branch and catalog compilation fails with
+#   "  is not a supported operating system." -- note the empty OS name. The SIMP
+#   server escapes it only because simp config writes include_legacy_facts = true
+#   into its own puppet.conf; bootstrap_simp_client writes no such line.
+#   Reads os.name / os.release.major instead. NOTE: upstream repo is archived.
 mod 'trlinkin-nsswitch',
-  :git => 'https://github.com/simp/pupmod-trlinkin-nsswitch',
-  :tag => 'simp-2.3.0'
+  :git => "#{el9_fork_base}/pupmod-trlinkin-nsswitch",
+  :tag => '2.3.1-el9'
 
 mod 'voxpupuli-chrony',
   :git => 'https://github.com/simp/pupmod-voxpupuli-chrony',
