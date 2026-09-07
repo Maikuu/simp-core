@@ -62,3 +62,9 @@ repodata/
 
 # macOS finder metadata
 .DS_Store
+
+# reposync'd upstream RPMs (the OpenVox payload that becomes /SimpRepos/puppet
+# on the ISO). ~152 MB of binaries, refetched by the build; two of them trip
+# GitHub's 50 MB advisory limit. NOT versioned here -- the authoritative copy of
+# any given pin is the ISO that shipped it, which carries the same RPMs.
+build/distributions/*/*/*/yum_data/reposync/
