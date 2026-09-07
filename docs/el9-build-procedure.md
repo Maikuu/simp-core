@@ -287,9 +287,36 @@ Point it at the RHEL 9 project and nothing else changes:
 
 ### Forked so far
 
-| module | fork tag | fixes |
-|---|---|---|
-| `pupmod-simp-named` | `7.0.2-el9` | `/var/named` mode 0750 -> 1770 (BIND cannot start otherwise); rsync username from `$environment` rather than `$server_facts` |
+| module | fork tag | ships as | fixes |
+|---|---|---|---|
+| `pupmod-simp-named` | `7.0.3-el9` | `pupmod-simp-named-7.0.3-1.el9` | `/var/named` mode 0750 -> 1770 (BIND cannot start otherwise); rsync username from `$environment` rather than `$server_facts`; version bumped so the RPM is distinguishable from upstream 7.0.2 |
+
+### Two traps when changing a fork's pin
+
+**`deps:checkout` skips modules that already exist.** It prints
+
+    Warning: Some repositories were skipped!
+      * This is expected if re-running a build
+
+and leaves the old checkout in place, so a changed pin is silently ignored and
+the build ships the previous code. Remove the module first:
+
+    rm -rf src/puppet/modules/<module>
+    bundle exec rake 'deps:checkout[el9]'
+
+**The aggregated repo is never pruned.** `build/distributions/.../SIMP/{RPMS,SRPMS}`
+accumulates every version ever built, and all of them reach the ISO. After a
+version bump both the old and new RPM ship. Check for duplicates before
+building:
+
+    ls build/distributions/RedHat/9/x86_64/SIMP/RPMS/noarch/*.rpm \
+      | sed 's|.*/||;s|-[0-9][^-]*-[0-9].*\.rpm$||' | sort | uniq -d
+
+This is not hypothetical: `pupmod-simp-simp_firewalld` **3.0.0** had been
+shipping alongside the pinned **2.0.3** on every ISO, left over from an earlier
+build. `pupmod-simp-iptables` requires `simp_firewalld < 3.0.0`, so a stray
+newer copy in the repo is exactly the kind of thing that perturbs dependency
+resolution.
 
 Still patch-script based, candidates for forking: `iptables` (nft-aware SysV
 status), `clamav` / `dhcp` / `freeradius` / `simp_apache` (`$facts['environment']`),

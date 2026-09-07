@@ -334,7 +334,7 @@ mod 'simp-mozilla',
 #     empty under `puppet apply` and collapses the name to a double underscore.
 mod 'simp-named',
   :git => "#{el9_fork_base}/pupmod-simp-named",
-  :tag => '7.0.2-el9'
+  :tag => '7.0.3-el9'
 
 mod 'simp-nfs',
   :git => 'https://github.com/simp/pupmod-simp-nfs',
