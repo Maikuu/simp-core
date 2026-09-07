@@ -161,7 +161,7 @@ Which `dist/` goes with which patch script:
 | `simp-cli/apply-el9-simp-cli.sh` | `src/assets/rubygem_simp_cli/dist` |
 | `environment-skeleton/apply-el9-hiera.sh` | `src/assets/environment/dist` |
 | `rsync-skeleton/apply-el9-rsync.sh` | `src/assets/rsync_data/dist` |
-| `modules/apply-el9-module-patches.sh` | `src/puppet/modules/{clamav,dhcp,freeradius,simp_apache,iptables}/dist` |
+| `modules/apply-el9-module-patches.sh` | `src/puppet/modules/{clamav,dhcp,freeradius,simp_apache,iptables,named}/dist` |
 | `gpgkeys/apply-el9-gpgkeys.sh` | `src/assets/gpgkeys/dist` |
 
 ## Signing with a long-term key instead of `dev`

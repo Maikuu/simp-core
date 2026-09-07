@@ -83,6 +83,55 @@ echo
 echo "  total replacements this run: $total"
 
 # ---------------------------------------------------------------------------
+# pupmod-simp-named builds its rsync USERNAME from $server_facts['environment'].
+#
+# $server_facts is only populated when a master compiles the catalog. Under
+# `puppet apply` -- which the SIMP bootstrap uses -- it is empty, so the user
+# collapses to a double underscore:
+#
+#     bind_dns_default_rsync__RedHat_9      (wanted: ..._rsync_production_RedHat_9)
+#
+# rsyncd then rejects the login, and because the password is
+# simplib::passgen($_rsync_user), the derived password is wrong too -- so the
+# symptom is "auth failed" rather than an obvious name mismatch.
+#
+# The same class of defect as the $facts['environment'] fix above. Note the two
+# are NOT interchangeable: $facts['environment'] is always empty on Puppet 8,
+# while $server_facts['environment'] merely fails under puppet apply. The fix is
+# the same either way -- the built-in $environment, which is correct in both
+# contexts.
+#
+# Note also that named's own $rsync_source (non_chroot.pp:25) already uses
+# $environment, so this leaves the two consistent rather than introducing a new
+# convention.
+# ---------------------------------------------------------------------------
+SF_OLD='${server_facts['"'"'environment'"'"']}'
+SF_NEW='${environment}'
+for rel in manifests/chroot.pp manifests/non_chroot.pp; do
+  t="$MODS/named/$rel"
+  if [ ! -f "$t" ]; then echo "  [named] SKIP: $rel absent"; continue; fi
+  n=$(grep -c -F "$SF_OLD" "$t" || true)
+  if [ "$n" -eq 0 ]; then
+    echo "  [named] already patched ($rel)"
+    continue
+  fi
+  python3 - "$t" "$SF_OLD" "$SF_NEW" <<'PY'
+import sys
+path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+s = open(path).read()
+open(path, 'w').write(s.replace(old, new))
+PY
+  echo "  [named] patched $n occurrence(s) in $rel"
+done
+
+echo "  --- no server_facts['environment'] should remain ---"
+if grep -rn -F "$SF_OLD" "$MODS"/*/manifests/ 2>/dev/null; then
+  echo "  ** still present above -- investigate **"; exit 1
+else
+  echo "  clean"
+fi
+
+# ---------------------------------------------------------------------------
 # The SysV status check cannot see an nf_tables-backed firewall.
 #
 # iptables::service hardcodes provider => 'redhat' and ships its own SysV
